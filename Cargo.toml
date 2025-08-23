@@ -13,3 +13,6 @@ edition = "2024"
 authors = ["Pasindu Pramodya"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/loreal-lang/loreal"
+
+[workspace.dependencies]
+clap = { version = "4.5.47", features = ["derive"] }
