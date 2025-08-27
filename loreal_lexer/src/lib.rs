@@ -1,115 +1,45 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Span {
-    /// Byte offset of the start of the span (inclusive)
-    pub start: usize,
-    /// Byte offset of the end of the span (exclusive)
-    pub end: usize,
+use std::iter::Peekable;
+use std::str::CharIndices;
+use thiserror::Error;
+
+mod token;
+mod  span;
+
+#[derive(Error, Debug, Clone)]
+pub enum LexError {
+    #[error("Unexpected character '{ch}' at position {pos}")]
+    UnexpectedCharacter { ch: char, pos: usize },
+
+    #[error("Unterminated string literal starting at position {start}")]
+    UnterminatedString { start: usize },
+
+    #[error("Invalid escape sequence '\\{seq}' at position {pos}")]
+    InvalidEscapeSequence { seq: String, pos: usize },
+
+    #[error("Invalid number format '{text}' at position {pos}")]
+    InvalidNumber { text: String, pos: usize },
+
+    #[error("Unterminated block comment starting at position {start}")]
+    UnterminatedBlockComment { start: usize },
+
+    #[error("Unterminated character literal at position {pos}")]
+    UnterminatedCharLiteral { pos: usize },
 }
 
-impl Span {
-    /// Create a new span from start and end byte offsets
-    pub fn new(start: usize, end: usize) -> Self {
-        debug_assert!(start <= end, "Span start must be <= end");
-        Self { start, end }
-    }
+pub struct Lexer<'source> {
+    _source: &'source str,
+    /// Iterator over chars with their byte positions
+    chars: Peekable<CharIndices<'source>>,
+    /// Current byte position
+    current_pos: usize,
+}
 
-    /// Merge two spans into a single span covering both
-    pub fn merge(self, other: Span) -> Span {
-        Span {
-            start: self.start.min(other.start),
-            end: self.end.max(other.end),
+impl<'source> Lexer<'source> {
+    pub fn new(source: &'source str) -> Self {
+        Self {
+            _source: source,
+            chars: source.char_indices().peekable(),
+            current_pos: 0,
         }
     }
-
-    /// Get the length of the span in bytes
-    pub fn len(&self) -> usize {
-        self.end - self.start
-    }
-
-    /// Check if the span is empty
-    pub fn is_empty(&self) -> bool {
-        self.start == self.end
-    }
-}
-
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Token {
-    pub kind: TokenKind,
-    pub span: Span,
-}
-
-impl Token {
-    pub fn new(kind: TokenKind, span: Span) -> Self {
-        Self { kind, span }
-    }
-}
-
-/// Types of tokens in the Loreal language
-#[derive(Debug, Clone, PartialEq)]
-pub enum TokenKind {
-    // Keywords
-    Module,
-    Def,
-    Do,
-    End,
-    Let,
-    If,
-    Else,
-    Match,
-    Import,
-    Export,
-    Protocol,
-    Impl,
-    Struct,
-    True,
-    False,
-    Nil,
-    Fn,
-    Loop,
-    Next,
-    Break,
-
-
-    // Operators
-    Plus,    // +
-    Minus,   // -
-    Star,    // *
-    Slash,   // /
-    Percent, // %
-
-    // Comparison
-    EqEq, // ==
-    Ne,   // !=
-    Lt,   // <
-    Le,   // <=
-    Gt,   // >
-    Ge,   // >=
-
-    // Logical
-    And, // and (keyword-based)
-    Or,  // or (keyword-based)
-    Not, // !
-
-    // Assignment and Arrows
-    Eq,       // =
-    Arrow,    // ->
-    FatArrow, // =>
-    Pipe,     // |>
-
-    // Delimiters
-    LParen,    // (
-    RParen,    // )
-    LBracket,  // [
-    RBracket,  // ]
-    LBrace,    // {
-    RBrace,    // }
-    Comma,     // ,
-    Colon,     // :
-    Semicolon, // ;
-    Dot,       // .
-    Bar,       // |
-
-    // Special
-    Eof,
 }

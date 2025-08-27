@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-
+use miette::{IntoDiagnostic, Result};
 
 #[derive(Parser)]
 #[command(name = "loreal")]
@@ -13,12 +13,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Compile a Loreal source file
     Build {
         input: PathBuf,
 
+        #[arg(short, long)]
+        output: Option<PathBuf>,
     },
 
-    /// Compile and run a Loreal program
     Run {
         /// Input source file
         input: PathBuf,
@@ -29,19 +31,26 @@ enum Commands {
     },
 }
 
-
-fn main() {
+fn main() -> Result<()> {
     // Parse command-line arguments
     let cli = Cli::parse();
-    match &cli.command {
-        Commands::Build { input } => {
-            println!("Building Loreal program from file: {:?}", input);
-            // Here you would add the logic to build the Loreal program
-        }
+    match cli.command {
+        Commands::Build { input, output } => {
+            println!("📦 Building: {}", input.display());
 
-        Commands::Run { input, args } => {
-            println!("Running Loreal program from file: {:?} with args: {:?}", input, args);
-            // Here you would add the logic to run the Loreal program
+            // Phase 1: Read source file
+            let source = std::fs::read_to_string(&input)
+                .into_diagnostic()
+                .map_err(|e| {
+                    eprintln!("Failed to read source file: {}", e);
+                    e
+                })?;
+            println!("✓ Loaded {} bytes", source.len());
+            // Phase 1: Lexing
+            println!("🔤 Tokenizing...");
+            let lexer = loreal_lexer::Lexer::new(&source);
+            Ok(())
         }
+        Commands::Run { input, args } => todo!(),
     }
 }

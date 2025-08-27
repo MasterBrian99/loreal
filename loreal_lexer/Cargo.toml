@@ -7,3 +7,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+smol_str.workspace = true
+loreal_ast = { path = "../loreal_ast" }
+thiserror.workspace = true

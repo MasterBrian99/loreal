@@ -9,3 +9,4 @@ repository.workspace = true
 [dependencies]
 clap.workspace = true
 miette.workspace = true
+loreal_lexer = { path = "../loreal_lexer" }
