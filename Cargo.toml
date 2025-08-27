@@ -2,7 +2,7 @@
 
 [workspace]
 resolver = "2"
-members = ["loreal_cli","loreal_lexer"]
+members = ["loreal_ast","loreal_cli","loreal_lexer"]
 
 
 
@@ -18,3 +18,10 @@ repository = "https://github.com/loreal-lang/loreal"
 clap = { version = "4.5.47", features = ["derive"] }
 miette = { version = "7.0", features = ["fancy"] }
 thiserror = "2.0"
+
+
+# String handling
+smol_str = "0.3"
+# Type inference and graph algorithms
+ena = "0.14"
+petgraph = "0.6"

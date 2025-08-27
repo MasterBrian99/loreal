@@ -1,0 +1,10 @@
+[package]
+name = "loreal_ast"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+smol_str.workspace = true
