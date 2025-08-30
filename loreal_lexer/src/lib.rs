@@ -1,12 +1,12 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
+use loreal_ast::span::Span;
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::{span::Span, token::{Token, TokenKind}};
+use crate::{token::{Token, TokenKind}};
 
 mod token;
-mod  span;
 
 #[derive(Error, Debug, Clone)]
 pub enum LexError {
