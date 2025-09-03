@@ -2,7 +2,7 @@
 
 [workspace]
 resolver = "2"
-members = ["loreal_ast","loreal_cli","loreal_lexer"]
+members = ["loreal_ast","loreal_cli","loreal_lexer", "loreal_parser"]
 
 
 
