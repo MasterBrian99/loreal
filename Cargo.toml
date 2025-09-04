@@ -2,7 +2,16 @@
 
 [workspace]
 resolver = "2"
-members = ["loreal_ast","loreal_cli","loreal_lexer", "loreal_parser"]
+members = [
+    "loreal_ast",
+    "loreal_cli",
+    "loreal_lexer",
+    "loreal_parser",
+    "loreal_semantic",
+    "loreal_mir",
+    "loreal_codegen",
+    "loreal_runtime",
+]
 
 
 
@@ -19,9 +28,15 @@ clap = { version = "4.5.47", features = ["derive"] }
 miette = { version = "7.0", features = ["fancy"] }
 thiserror = "2.0"
 
-
 # String handling
 smol_str = "0.3"
+
 # Type inference and graph algorithms
 ena = "0.14"
 petgraph = "0.6"
+
+# Bit manipulation for liveness analysis
+bit-set = "0.8"
+
+# Runtime dependencies
+mimalloc = "0.1"
