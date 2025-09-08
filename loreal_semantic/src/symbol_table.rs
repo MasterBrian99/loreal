@@ -1,5 +1,5 @@
-use crate::types::ConcreteType;
 use crate::error::SemanticError;
+use crate::types::ConcreteType;
 use loreal_ast::Span;
 use smol_str::SmolStr;
 use std::collections::HashMap;
