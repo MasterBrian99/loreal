@@ -1,6 +1,6 @@
 use crate::error::SemanticError;
+use crate::symbol_table::{SymbolInfo, SymbolTable};
 use crate::types::ConcreteType;
-use crate::symbol_table::{SymbolTable, SymbolInfo};
 use loreal_ast::*;
 use smol_str::SmolStr;
 use std::collections::HashMap;
@@ -70,6 +70,245 @@ impl TypeChecker {
             Ok(())
         } else {
             Err(std::mem::take(&mut self.errors))
+        }
+    }
+
+    fn check_function(&mut self, func: &FunctionDef) {
+        self.symbol_table.push_scope();
+
+        for (pattern, ty) in &func.params {
+            if let Pattern::Identifier { name, span } = pattern {
+                let param_type = ConcreteType::from_ast_type(ty);
+                if let Err(e) = self.symbol_table.insert(
+                    name.clone(),
+                    SymbolInfo {
+                        name: name.clone(),
+                        ty: param_type.clone(),
+                        span: *span,
+                    },
+                ) {
+                    self.errors.push(e);
+                }
+                self.variable_types
+                    .insert((func.name.clone(), name.clone()), param_type);
+            }
+        }
+
+        self.current_func = Some(func.name.clone());
+        let body_type = self.infer_expr(&func.body);
+        let expected_return = ConcreteType::from_ast_type(&func.return_type);
+
+        if !body_type.is_compatible(&expected_return) {
+            self.errors.push(SemanticError::TypeMismatch {
+                expected: expected_return.to_string(),
+                found: body_type.to_string(),
+                span: func.body.span(),
+            });
+        }
+        self.current_func = None;
+
+        self.symbol_table.pop_scope();
+    }
+
+    fn infer_expr(&mut self, expr: &Expr) -> ConcreteType {
+        match expr {
+            Expr::IntLiteral { .. } => ConcreteType::Int,
+            Expr::FloatLiteral { .. } => ConcreteType::Float,
+            Expr::BoolLiteral { .. } => ConcreteType::Bool,
+            Expr::CharLiteral { .. } => ConcreteType::Char,
+            Expr::StringLiteral { .. } => ConcreteType::String,
+            Expr::NilLiteral { .. } => ConcreteType::Nil,
+
+            Expr::Identifier { name, span } => {
+                if let Some(info) = self.symbol_table.lookup(name) {
+                    info.ty.clone()
+                } else {
+                    self.errors.push(SemanticError::UndefinedVariable {
+                        name: name.clone(),
+                        span: *span,
+                    });
+                    ConcreteType::Unknown
+                }
+            }
+
+            Expr::BinaryOp {
+                op,
+                left,
+                right,
+                span,
+            } => {
+                let left_ty = self.infer_expr(left);
+                let right_ty = self.infer_expr(right);
+                self.check_binary_op(*op, &left_ty, &right_ty, *span)
+            }
+
+            Expr::UnaryOp { op, operand, .. } => {
+                let operand_ty = self.infer_expr(operand);
+                match op {
+                    UnOp::Neg => {
+                        if operand_ty.is_compatible(&ConcreteType::Int)
+                            || operand_ty.is_compatible(&ConcreteType::Float)
+                        {
+                            operand_ty
+                        } else {
+                            ConcreteType::Int
+                        }
+                    }
+                    UnOp::Not => ConcreteType::Bool,
+                }
+            }
+
+            Expr::If {
+                condition,
+                then_branch,
+                else_branch,
+                span,
+            } => {
+                let cond_ty = self.infer_expr(condition);
+                if !cond_ty.is_compatible(&ConcreteType::Bool) {
+                    self.errors.push(SemanticError::TypeMismatch {
+                        expected: "Bool".to_string(),
+                        found: cond_ty.to_string(),
+                        span: condition.span(),
+                    });
+                }
+
+                let then_ty = self.infer_expr(then_branch);
+                let else_ty = self.infer_expr(else_branch);
+
+                if !then_ty.is_compatible(&else_ty) {
+                    self.errors.push(SemanticError::TypeMismatch {
+                        expected: then_ty.to_string(),
+                        found: else_ty.to_string(),
+                        span: *span,
+                    });
+                }
+
+                then_ty
+            }
+
+            Expr::Block {
+                statements,
+                result,
+                ..
+            } => {
+                self.symbol_table.push_scope();
+
+                for stmt in statements {
+                    self.check_statement(stmt);
+                }
+
+                let result_ty = self.infer_expr(result);
+                self.symbol_table.pop_scope();
+                result_ty
+            }
+
+            _ => ConcreteType::Unknown,
+        }
+    }
+
+    fn check_binary_op(
+        &mut self,
+        op: BinOp,
+        left_ty: &ConcreteType,
+        right_ty: &ConcreteType,
+        span: Span,
+    ) -> ConcreteType {
+        match op {
+            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
+                if left_ty.is_compatible(&ConcreteType::Int)
+                    && right_ty.is_compatible(&ConcreteType::Int)
+                {
+                    ConcreteType::Int
+                } else if left_ty.is_compatible(&ConcreteType::Float)
+                    || right_ty.is_compatible(&ConcreteType::Float)
+                {
+                    ConcreteType::Float
+                } else {
+                    self.errors.push(SemanticError::InvalidBinaryOp {
+                        op,
+                        left: left_ty.to_string(),
+                        right: right_ty.to_string(),
+                        span,
+                    });
+                    ConcreteType::Int
+                }
+            }
+
+            BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => ConcreteType::Bool,
+
+            BinOp::Eq | BinOp::Ne => ConcreteType::Bool,
+
+            BinOp::And | BinOp::Or => {
+                if !left_ty.is_compatible(&ConcreteType::Bool) {
+                    self.errors.push(SemanticError::TypeMismatch {
+                        expected: "Bool".to_string(),
+                        found: left_ty.to_string(),
+                        span,
+                    });
+                }
+                if !right_ty.is_compatible(&ConcreteType::Bool) {
+                    self.errors.push(SemanticError::TypeMismatch {
+                        expected: "Bool".to_string(),
+                        found: right_ty.to_string(),
+                        span,
+                    });
+                }
+                ConcreteType::Bool
+            }
+
+            BinOp::Pipe => ConcreteType::Unknown,
+        }
+    }
+
+    fn check_statement(&mut self, stmt: &Statement) {
+        match stmt {
+            Statement::Let {
+                pattern,
+                type_annotation,
+                value,
+                span,
+            } => {
+                let value_ty = self.infer_expr(value);
+
+                if let Some(annotation) = type_annotation {
+                    let expected_ty = ConcreteType::from_ast_type(annotation);
+                    if !value_ty.is_compatible(&expected_ty) {
+                        self.errors.push(SemanticError::TypeMismatch {
+                            expected: expected_ty.to_string(),
+                            found: value_ty.to_string(),
+                            span: *span,
+                        });
+                    }
+                }
+
+                if let Pattern::Identifier { name, span } = pattern {
+                    let ty = if let Some(annotation) = type_annotation {
+                        ConcreteType::from_ast_type(annotation)
+                    } else {
+                        value_ty
+                    };
+
+                    if let Err(e) = self.symbol_table.insert(
+                        name.clone(),
+                        SymbolInfo {
+                            name: name.clone(),
+                            ty: ty.clone(),
+                            span: *span,
+                        },
+                    ) {
+                        self.errors.push(e);
+                    }
+                    if let Some(func_name) = &self.current_func {
+                        self.variable_types
+                            .insert((func_name.clone(), name.clone()), ty);
+                    }
+                }
+            }
+
+            Statement::Expr { expr, .. } => {
+                self.infer_expr(expr);
+            }
         }
     }
 }
