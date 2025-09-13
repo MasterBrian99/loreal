@@ -188,7 +188,9 @@ impl TypeChecker {
             }
 
             Expr::Block {
-                statements, result, ..
+                statements,
+                result,
+                ..
             } => {
                 self.symbol_table.push_scope();
 
@@ -199,6 +201,56 @@ impl TypeChecker {
                 let result_ty = self.infer_expr(result);
                 self.symbol_table.pop_scope();
                 result_ty
+            }
+
+            Expr::FunctionCall { func, args, span } => {
+                if let Expr::Identifier { name, .. } = func.as_ref() {
+                    let func_info = self.symbol_table.lookup(name).cloned();
+
+                    if let Some(info) = func_info {
+                        if let ConcreteType::Function {
+                            params,
+                            return_type,
+                        } = &info.ty
+                        {
+                            if args.len() != params.len() {
+                                self.errors.push(SemanticError::TypeMismatch {
+                                    expected: format!("{} arguments", params.len()),
+                                    found: format!("{} arguments", args.len()),
+                                    span: *span,
+                                });
+                            }
+
+                            for (arg, expected_ty) in args.iter().zip(params.iter()) {
+                                let arg_ty = self.infer_expr(arg);
+                                if !arg_ty.is_compatible(expected_ty) {
+                                    self.errors.push(SemanticError::TypeMismatch {
+                                        expected: expected_ty.to_string(),
+                                        found: arg_ty.to_string(),
+                                        span: arg.span(),
+                                    });
+                                }
+                            }
+
+                            (**return_type).clone()
+                        } else {
+                            self.errors.push(SemanticError::TypeMismatch {
+                                expected: "function".to_string(),
+                                found: info.ty.to_string(),
+                                span: *span,
+                            });
+                            ConcreteType::Unknown
+                        }
+                    } else {
+                        self.errors.push(SemanticError::UndefinedFunction {
+                            name: name.clone(),
+                            span: *span,
+                        });
+                        ConcreteType::Unknown
+                    }
+                } else {
+                    ConcreteType::Unknown
+                }
             }
 
             _ => ConcreteType::Unknown,
