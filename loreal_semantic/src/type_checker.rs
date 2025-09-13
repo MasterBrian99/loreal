@@ -188,9 +188,7 @@ impl TypeChecker {
             }
 
             Expr::Block {
-                statements,
-                result,
-                ..
+                statements, result, ..
             } => {
                 self.symbol_table.push_scope();
 
