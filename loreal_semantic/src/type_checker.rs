@@ -359,6 +359,55 @@ impl TypeChecker {
                 }
             }
 
+            Expr::List { elements, span: _ } => {
+                if elements.is_empty() {
+                    ConcreteType::List(Box::new(ConcreteType::Unknown))
+                } else {
+                    let first_ty = self.infer_expr(&elements[0]);
+                    for elem in elements.iter().skip(1) {
+                        let elem_ty = self.infer_expr(elem);
+                        if !elem_ty.is_compatible(&first_ty) {
+                            self.errors.push(SemanticError::TypeMismatch {
+                                expected: first_ty.to_string(),
+                                found: elem_ty.to_string(),
+                                span: elem.span(),
+                            });
+                        }
+                    }
+                    ConcreteType::List(Box::new(first_ty))
+                }
+            }
+
+            Expr::IndexAccess {
+                object,
+                index,
+                span,
+            } => {
+                let obj_ty = self.infer_expr(object);
+                let index_ty = self.infer_expr(index);
+
+                if !index_ty.is_compatible(&ConcreteType::Int) {
+                    self.errors.push(SemanticError::TypeMismatch {
+                        expected: "Int".to_string(),
+                        found: index_ty.to_string(),
+                        span: index.span(),
+                    });
+                }
+
+                match obj_ty {
+                    ConcreteType::List(elem_ty) => *elem_ty,
+                    ConcreteType::String => ConcreteType::Char,
+                    _ => {
+                        self.errors.push(SemanticError::TypeMismatch {
+                            expected: "List".to_string(),
+                            found: obj_ty.to_string(),
+                            span: *span,
+                        });
+                        ConcreteType::Unknown
+                    }
+                }
+            }
+
             _ => ConcreteType::Unknown,
         }
     }
