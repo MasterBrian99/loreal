@@ -188,9 +188,7 @@ impl TypeChecker {
             }
 
             Expr::Block {
-                statements,
-                result,
-                ..
+                statements, result, ..
             } => {
                 self.symbol_table.push_scope();
 
@@ -250,6 +248,114 @@ impl TypeChecker {
                     }
                 } else {
                     ConcreteType::Unknown
+                }
+            }
+
+            Expr::StructLiteral { name, fields, span } => {
+                let struct_def = self.struct_types.get(name).cloned();
+                if let Some(def) = struct_def {
+                    let mut field_map: HashMap<SmolStr, &Type> =
+                        def.fields.iter().map(|(n, t)| (n.clone(), t)).collect();
+
+                    for (field_name, field_expr) in fields {
+                        if let Some(expected_ty) = field_map.remove(field_name) {
+                            let val_ty = self.infer_expr(field_expr);
+                            let expected_concrete = ConcreteType::from_ast_type(expected_ty);
+                            if !val_ty.is_compatible(&expected_concrete) {
+                                self.errors.push(SemanticError::TypeMismatch {
+                                    expected: expected_concrete.to_string(),
+                                    found: val_ty.to_string(),
+                                    span: field_expr.span(),
+                                });
+                            }
+                        } else {
+                            self.errors.push(SemanticError::UndefinedField {
+                                field: field_name.clone(),
+                                ty: name.to_string(),
+                                span: field_expr.span(),
+                            });
+                        }
+                    }
+
+                    for missing_field in field_map.keys() {
+                        self.errors.push(SemanticError::TypeMismatch {
+                            expected: format!("field '{}'", missing_field),
+                            found: "missing".to_string(),
+                            span: *span,
+                        });
+                    }
+
+                    ConcreteType::Named(name.clone())
+                } else {
+                    self.errors.push(SemanticError::UndefinedType {
+                        name: name.clone(),
+                        span: *span,
+                    });
+                    ConcreteType::Unknown
+                }
+            }
+
+            Expr::Tuple { elements, span: _ } => {
+                let mut types = Vec::new();
+                for elem in elements {
+                    types.push(self.infer_expr(elem));
+                }
+                ConcreteType::Tuple(types)
+            }
+
+            Expr::FieldAccess {
+                object,
+                field,
+                span,
+            } => {
+                let obj_ty = self.infer_expr(object);
+                match &obj_ty {
+                    ConcreteType::Named(name) => {
+                        if let Some(def) = self.struct_types.get(name) {
+                            if let Some((_, field_ty)) = def.fields.iter().find(|(n, _)| n == field)
+                            {
+                                ConcreteType::from_ast_type(field_ty)
+                            } else {
+                                self.errors.push(SemanticError::UndefinedField {
+                                    field: field.clone(),
+                                    ty: name.to_string(),
+                                    span: *span,
+                                });
+                                ConcreteType::Unknown
+                            }
+                        } else {
+                            ConcreteType::Unknown
+                        }
+                    }
+                    ConcreteType::Tuple(types) => {
+                        if let Ok(index) = field.parse::<usize>() {
+                            if index < types.len() {
+                                types[index].clone()
+                            } else {
+                                self.errors.push(SemanticError::TypeMismatch {
+                                    expected: format!("tuple index < {}", types.len()),
+                                    found: format!("index {}", index),
+                                    span: *span,
+                                });
+                                ConcreteType::Unknown
+                            }
+                        } else {
+                            self.errors.push(SemanticError::TypeMismatch {
+                                expected: "tuple index (integer)".to_string(),
+                                found: format!("field '{}'", field),
+                                span: *span,
+                            });
+                            ConcreteType::Unknown
+                        }
+                    }
+                    _ => {
+                        self.errors.push(SemanticError::TypeMismatch {
+                            expected: "struct".to_string(),
+                            found: obj_ty.to_string(),
+                            span: *span,
+                        });
+                        ConcreteType::Unknown
+                    }
                 }
             }
 
