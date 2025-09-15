@@ -408,6 +408,50 @@ impl TypeChecker {
                 }
             }
 
+            Expr::Loop {
+                init_values,
+                loop_vars,
+                body,
+                span,
+            } => {
+                let init_types: Vec<ConcreteType> = init_values
+                    .iter()
+                    .map(|expr| self.infer_expr(expr))
+                    .collect();
+
+                self.symbol_table.push_scope();
+
+                for (var_name, var_type) in loop_vars.iter().zip(init_types.iter()) {
+                    if let Err(e) = self.symbol_table.insert(
+                        var_name.clone(),
+                        SymbolInfo {
+                            name: var_name.clone(),
+                            ty: var_type.clone(),
+                            span: *span,
+                        },
+                    ) {
+                        self.errors.push(e);
+                    }
+                }
+
+                let body_type = self.infer_expr(body);
+                self.symbol_table.pop_scope();
+                body_type
+            }
+
+            Expr::Next {
+                values,
+                span: _span,
+            } => {
+                let _value_types: Vec<ConcreteType> =
+                    values.iter().map(|expr| self.infer_expr(expr)).collect();
+                ConcreteType::Nil
+            }
+
+            Expr::Break { value, .. } => {
+                self.infer_expr(value)
+            }
+
             _ => ConcreteType::Unknown,
         }
     }
