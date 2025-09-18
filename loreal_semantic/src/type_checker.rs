@@ -448,9 +448,7 @@ impl TypeChecker {
                 ConcreteType::Nil
             }
 
-            Expr::Break { value, .. } => {
-                self.infer_expr(value)
-            }
+            Expr::Break { value, .. } => self.infer_expr(value),
 
             _ => ConcreteType::Unknown,
         }

@@ -1,0 +1,14 @@
+[package]
+name = "loreal_mir"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+loreal_ast = { path = "../loreal_ast" }
+petgraph.workspace = true
+bit-set.workspace = true
+smol_str.workspace = true
+
+[dev-dependencies]
