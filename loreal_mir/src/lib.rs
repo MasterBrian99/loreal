@@ -130,3 +130,79 @@ pub struct MirFunction {
     pub exit: NodeIndex,
     pub local_types: HashMap<SmolStr, Type>,
 }
+
+pub struct MirBuilder {
+    cfg: Graph<BasicBlock, ControlFlow>,
+    current_block: Option<NodeIndex>,
+    next_block_id: usize,
+    next_temp_id: usize,
+    variables: HashMap<SmolStr, Value>,
+    pub local_types: HashMap<SmolStr, Type>,
+    struct_types: HashMap<SmolStr, ast::StructDef>,
+}
+
+impl MirBuilder {
+    pub fn new() -> Self {
+        Self {
+            cfg: Graph::new(),
+            current_block: None,
+            next_block_id: 0,
+            next_temp_id: 0,
+            variables: HashMap::new(),
+            local_types: HashMap::new(),
+            struct_types: HashMap::new(),
+        }
+    }
+
+    pub fn with_context(
+        local_types: HashMap<SmolStr, Type>,
+        struct_types: HashMap<SmolStr, ast::StructDef>,
+    ) -> Self {
+        Self {
+            cfg: Graph::new(),
+            current_block: None,
+            next_block_id: 0,
+            next_temp_id: 0,
+            variables: HashMap::new(),
+            local_types,
+            struct_types,
+        }
+    }
+
+    fn new_temp(&mut self, ty: Type) -> SmolStr {
+        let name: SmolStr = format!("_t{}", self.next_temp_id).into();
+        self.next_temp_id += 1;
+        self.local_types.insert(name.clone(), ty);
+        name
+    }
+
+    fn new_block(&mut self, span: Span) -> NodeIndex {
+        let id = self.next_block_id;
+        self.next_block_id += 1;
+
+        let block = BasicBlock {
+            id,
+            instructions: Vec::new(),
+            terminator: Terminator::Return(Value::NilConst),
+            span,
+        };
+
+        self.cfg.add_node(block)
+    }
+
+    fn emit(&mut self, instr: Instruction) {
+        if let Some(block_idx) = self.current_block {
+            if let Some(block) = self.cfg.node_weight_mut(block_idx) {
+                block.instructions.push(instr);
+            }
+        }
+    }
+
+    fn set_terminator(&mut self, term: Terminator) {
+        if let Some(block_idx) = self.current_block {
+            if let Some(block) = self.cfg.node_weight_mut(block_idx) {
+                block.terminator = term;
+            }
+        }
+    }
+}
