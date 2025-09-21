@@ -93,3 +93,40 @@ pub enum Instruction {
         index: Value,
     },
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Terminator {
+    Return(Value),
+    Jump(NodeIndex),
+    Branch {
+        condition: Value,
+        then_block: NodeIndex,
+        else_block: NodeIndex,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct BasicBlock {
+    pub id: usize,
+    pub instructions: Vec<Instruction>,
+    pub terminator: Terminator,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ControlFlow {
+    Sequential,
+    Then,
+    Else,
+}
+
+#[derive(Debug, Clone)]
+pub struct MirFunction {
+    pub name: SmolStr,
+    pub params: Vec<(SmolStr, Type)>,
+    pub return_type: Type,
+    pub cfg: Graph<BasicBlock, ControlFlow>,
+    pub entry: NodeIndex,
+    pub exit: NodeIndex,
+    pub local_types: HashMap<SmolStr, Type>,
+}
