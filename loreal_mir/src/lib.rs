@@ -205,4 +205,94 @@ impl MirBuilder {
             }
         }
     }
+
+    pub fn lower_function(
+        &mut self,
+        name: SmolStr,
+        params: Vec<(SmolStr, Type)>,
+        return_type: Type,
+        body: &ast::Expr,
+    ) -> MirFunction {
+        let entry = self.new_block(body.span());
+        self.current_block = Some(entry);
+
+        for (param_name, _) in &params {
+            self.variables
+                .insert(param_name.clone(), Value::Var(param_name.clone()));
+        }
+
+        let (result_value, _) = self.lower_expr(body);
+
+        self.set_terminator(Terminator::Return(result_value));
+
+        let exit = entry;
+
+        MirFunction {
+            name,
+            params,
+            return_type,
+            cfg: self.cfg.clone(),
+            entry,
+            exit,
+            local_types: self.local_types.clone(),
+        }
+    }
+
+    fn lower_expr(&mut self, expr: &ast::Expr) -> (Value, Type) {
+        match expr {
+            ast::Expr::IntLiteral { value, .. } => (
+                Value::IntConst(*value),
+                Type::Named {
+                    name: "Int".into(),
+                    span: Span::new(0, 0),
+                },
+            ),
+            ast::Expr::FloatLiteral { value, .. } => (
+                Value::FloatConst(*value),
+                Type::Named {
+                    name: "Float".into(),
+                    span: Span::new(0, 0),
+                },
+            ),
+            ast::Expr::BoolLiteral { value, .. } => (
+                Value::BoolConst(*value),
+                Type::Named {
+                    name: "Bool".into(),
+                    span: Span::new(0, 0),
+                },
+            ),
+            ast::Expr::StringLiteral { value, .. } => (
+                Value::StringConst(value.clone()),
+                Type::Named {
+                    name: "String".into(),
+                    span: Span::new(0, 0),
+                },
+            ),
+            ast::Expr::NilLiteral { .. } => (
+                Value::NilConst,
+                Type::Named {
+                    name: "Nil".into(),
+                    span: Span::new(0, 0),
+                },
+            ),
+
+            ast::Expr::Identifier { name, span } => {
+                let val = self
+                    .variables
+                    .get(name)
+                    .cloned()
+                    .unwrap_or(Value::Var(name.clone()));
+                let ty = self.local_types.get(name).cloned().unwrap_or(Type::Named {
+                    name: "Unknown".into(),
+                    span: *span,
+                });
+                (val, ty)
+            }
+
+            _ => (Value::NilConst, Type::Named {
+                name: "Unknown".into(),
+                span: Span::new(0, 0),
+            }),
+        }
+    }
 }
