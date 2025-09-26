@@ -289,10 +289,13 @@ impl MirBuilder {
                 (val, ty)
             }
 
-            _ => (Value::NilConst, Type::Named {
-                name: "Unknown".into(),
-                span: Span::new(0, 0),
-            }),
+            _ => (
+                Value::NilConst,
+                Type::Named {
+                    name: "Unknown".into(),
+                    span: Span::new(0, 0),
+                },
+            ),
         }
     }
 }
