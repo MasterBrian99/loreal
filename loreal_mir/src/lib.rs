@@ -289,6 +289,53 @@ impl MirBuilder {
                 (val, ty)
             }
 
+            ast::Expr::BinaryOp {
+                op, left, right, ..
+            } => {
+                let (left_val, left_ty) = self.lower_expr(left);
+                let (right_val, _) = self.lower_expr(right);
+                let res_ty = match op {
+                    ast::BinOp::Eq
+                    | ast::BinOp::Ne
+                    | ast::BinOp::Lt
+                    | ast::BinOp::Le
+                    | ast::BinOp::Gt
+                    | ast::BinOp::Ge => Type::Named {
+                        name: "Bool".into(),
+                        span: Span::new(0, 0),
+                    },
+                    _ => left_ty,
+                };
+
+                let temp = self.new_temp(res_ty.clone());
+
+                self.emit(Instruction::BinaryOp {
+                    target: temp.clone(),
+                    op: *op,
+                    left: left_val,
+                    right: right_val,
+                });
+
+                let result = Value::Var(temp.clone());
+                self.variables.insert(temp, result.clone());
+                (result, res_ty)
+            }
+
+            ast::Expr::UnaryOp { op, operand, .. } => {
+                let (operand_val, operand_ty) = self.lower_expr(operand);
+                let temp = self.new_temp(operand_ty.clone());
+
+                self.emit(Instruction::UnaryOp {
+                    target: temp.clone(),
+                    op: *op,
+                    operand: operand_val,
+                });
+
+                let result = Value::Var(temp.clone());
+                self.variables.insert(temp, result.clone());
+                (result, operand_ty)
+            }
+
             _ => (
                 Value::NilConst,
                 Type::Named {
