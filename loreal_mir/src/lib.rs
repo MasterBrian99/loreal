@@ -406,4 +406,42 @@ impl MirBuilder {
             ),
         }
     }
+
+    fn lower_statement(&mut self, stmt: &ast::Statement) {
+        match stmt {
+            ast::Statement::Let {
+                pattern,
+                value,
+                type_annotation: _,
+                ..
+            } => {
+                if let ast::Pattern::Identifier { name, .. } = pattern {
+                    let (val, ty) = self.lower_expr(value);
+                    self.emit(Instruction::Assign {
+                        target: name.clone(),
+                        value: val,
+                    });
+                    self.variables.insert(name.clone(), Value::Var(name.clone()));
+                    self.local_types.insert(name.clone(), ty);
+                }
+            }
+            ast::Statement::Expr { expr, .. } => {
+                self.lower_expr(expr);
+            }
+        }
+    }
+}
+
+                self.lower_expr(result)
+            }
+
+            _ => (
+                Value::NilConst,
+                Type::Named {
+                    name: "Unknown".into(),
+                    span: Span::new(0, 0),
+                },
+            ),
+        }
+    }
 }
