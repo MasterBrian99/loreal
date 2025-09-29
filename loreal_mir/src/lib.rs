@@ -336,6 +336,67 @@ impl MirBuilder {
                 (result, operand_ty)
             }
 
+            ast::Expr::If {
+                condition,
+                then_branch,
+                else_branch,
+                span,
+            } => {
+                let (cond_val, _) = self.lower_expr(condition);
+
+                let then_block = self.new_block(*span);
+                let else_block = self.new_block(*span);
+                let merge_block = self.new_block(*span);
+
+                self.set_terminator(Terminator::Branch {
+                    condition: cond_val,
+                    then_block,
+                    else_block,
+                });
+
+                if let Some(current) = self.current_block {
+                    self.cfg.add_edge(current, then_block, ControlFlow::Then);
+                    self.cfg.add_edge(current, else_block, ControlFlow::Else);
+                }
+
+                self.current_block = Some(then_block);
+                let (then_val, then_ty) = self.lower_expr(then_branch);
+                let result_temp = self.new_temp(then_ty.clone());
+
+                self.emit(Instruction::Assign {
+                    target: result_temp.clone(),
+                    value: then_val,
+                });
+                self.set_terminator(Terminator::Jump(merge_block));
+                self.cfg
+                    .add_edge(then_block, merge_block, ControlFlow::Sequential);
+
+                self.current_block = Some(else_block);
+                let (else_val, _) = self.lower_expr(else_branch);
+                self.emit(Instruction::Assign {
+                    target: result_temp.clone(),
+                    value: else_val,
+                });
+                self.set_terminator(Terminator::Jump(merge_block));
+                self.cfg
+                    .add_edge(else_block, merge_block, ControlFlow::Sequential);
+
+                self.current_block = Some(merge_block);
+
+                (Value::Var(result_temp), then_ty)
+            }
+
+            ast::Expr::Block {
+                statements,
+                result,
+                ..
+            } => {
+                for stmt in statements {
+                    self.lower_statement(stmt);
+                }
+                self.lower_expr(result)
+            }
+
             _ => (
                 Value::NilConst,
                 Type::Named {
