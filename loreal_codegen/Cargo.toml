@@ -1,0 +1,21 @@
+[package]
+name = "loreal_codegen"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = ["llvm-backend"]
+llvm-backend = ["inkwell"]
+mlir-backend = []
+
+[dependencies]
+loreal_ast = { path = "../loreal_ast" }
+loreal_mir = { path = "../loreal_mir" }
+smol_str.workspace = true
+
+inkwell = { version = "0.7.1", features = ["llvm21-1", "target-all"], optional = true }
+either = "1.9"
+
+[dev-dependencies]
