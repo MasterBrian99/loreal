@@ -3,6 +3,10 @@ use petgraph::graph::{Graph, NodeIndex};
 use smol_str::SmolStr;
 use std::collections::HashMap;
 
+pub mod anf;
+
+pub use anf::ANFTransformer;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Var(SmolStr),
