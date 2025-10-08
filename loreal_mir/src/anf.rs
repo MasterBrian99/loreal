@@ -101,6 +101,87 @@ impl ANFTransformer {
                 Expr::Identifier { name: temp, span }
             }
 
+            Expr::UnaryOp { op, operand, span } => {
+                let atomic_operand = self.transform(*operand);
+
+                let temp = self.new_temp(span);
+                let atomic_op = if self.is_atomic(&atomic_operand) {
+                    atomic_operand
+                } else {
+                    let t = self.new_temp(span);
+                    self.bindings.push(Statement::Let {
+                        pattern: ast::Pattern::Identifier {
+                            name: t.clone(),
+                            span,
+                        },
+                        type_annotation: None,
+                        value: Box::new(atomic_operand),
+                        span,
+                    });
+                    Expr::Identifier { name: t, span }
+                };
+
+                let result_expr = Expr::UnaryOp {
+                    op,
+                    operand: Box::new(atomic_op),
+                    span,
+                };
+
+                self.bindings.push(Statement::Let {
+                    pattern: ast::Pattern::Identifier {
+                        name: temp.clone(),
+                        span,
+                    },
+                    type_annotation: None,
+                    value: Box::new(result_expr),
+                    span,
+                });
+
+                Expr::Identifier { name: temp, span }
+            }
+
+            Expr::FunctionCall { func, args, span } => {
+                let atomic_func = self.transform(*func);
+                let mut atomic_args = Vec::new();
+                for arg in args {
+                    let atomic_arg = self.transform(arg);
+                    if self.is_atomic(&atomic_arg) {
+                        atomic_args.push(atomic_arg);
+                    } else {
+                        let t = self.new_temp(span);
+                        self.bindings.push(Statement::Let {
+                            pattern: ast::Pattern::Identifier {
+                                name: t.clone(),
+                                span,
+                            },
+                            type_annotation: None,
+                            value: Box::new(atomic_arg),
+                            span,
+                        });
+                        atomic_args.push(Expr::Identifier { name: t, span });
+                    }
+                }
+
+                let temp = self.new_temp(span);
+                let result_expr = Expr::FunctionCall {
+                    func: Box::new(atomic_func),
+                    args: atomic_args,
+                    span,
+                };
+
+                self.bindings.push(Statement::Let {
+                    pattern: ast::Pattern::Identifier {
+                        name: temp.clone(),
+                        span,
+                    },
+                    type_annotation: None,
+                    value: Box::new(result_expr),
+                    span,
+                });
+
+                Expr::Identifier { name: temp, span }
+            }
+
             _ => expr,
         }
     }
