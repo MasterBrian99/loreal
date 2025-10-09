@@ -7,6 +7,15 @@ pub struct ANFTransformer {
 }
 
 impl ANFTransformer {
+    pub fn get_bindings(&self) -> Vec<Statement> {
+        self.bindings.clone()
+    }
+
+    pub fn clear_bindings(&mut self) {
+        self.bindings.clear();
+    }
+
+impl ANFTransformer {
     pub fn new() -> Self {
         Self {
             next_temp_id: 0,
