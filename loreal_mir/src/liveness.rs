@@ -76,12 +76,19 @@ impl LivenessAnalyzer {
                 Instruction::Assign { value, .. } => {
                     self.collect_variables(value, &mut use_set, &mut def_set);
                 }
-                Instruction::BinaryOp { left, right, target, .. } => {
+                Instruction::BinaryOp {
+                    left,
+                    right,
+                    target,
+                    ..
+                } => {
                     self.collect_variables(left, &mut use_set, &mut def_set);
                     self.collect_variables(right, &mut use_set, &mut def_set);
                     def_set.insert(target.clone());
                 }
-                Instruction::UnaryOp { operand, target, .. } => {
+                Instruction::UnaryOp {
+                    operand, target, ..
+                } => {
                     self.collect_variables(operand, &mut use_set, &mut def_set);
                     def_set.insert(target.clone());
                 }
@@ -97,16 +104,30 @@ impl LivenessAnalyzer {
                     self.collect_variables(object, &mut use_set, &mut def_set);
                     def_set.insert(target.clone());
                 }
-                Instruction::FieldStore { target, value, field: _ } => {
+                Instruction::FieldStore {
+                    target,
+                    value,
+                    field: _,
+                } => {
                     use_set.insert(target.clone());
                     self.collect_variables(value, &mut use_set, &mut def_set);
                 }
-                Instruction::IndexLoad { object, index, target, .. } => {
+                Instruction::IndexLoad {
+                    object,
+                    index,
+                    target,
+                    ..
+                } => {
                     self.collect_variables(object, &mut use_set, &mut def_set);
                     self.collect_variables(index, &mut use_set, &mut def_set);
                     def_set.insert(target.clone());
                 }
-                Instruction::IndexStore { target, index, value, .. } => {
+                Instruction::IndexStore {
+                    target,
+                    index,
+                    value,
+                    ..
+                } => {
                     use_set.insert(target.clone());
                     self.collect_variables(index, &mut use_set, &mut def_set);
                     self.collect_variables(value, &mut use_set, &mut def_set);
@@ -118,7 +139,12 @@ impl LivenessAnalyzer {
         (use_set, def_set)
     }
 
-    fn collect_variables(&self, val: &Value, use_set: &mut HashSet<SmolStr>, def_set: &mut HashSet<SmolStr>) {
+    fn collect_variables(
+        &self,
+        val: &Value,
+        use_set: &mut HashSet<SmolStr>,
+        def_set: &mut HashSet<SmolStr>,
+    ) {
         match val {
             Value::Var(name) if !def_set.contains(name) => {
                 use_set.insert(name.clone());
@@ -127,7 +153,12 @@ impl LivenessAnalyzer {
         }
     }
 
-    fn compute_kill_points(&mut self, node: NodeIndex, block: &BasicBlock, live_out: &HashSet<SmolStr>) {
+    fn compute_kill_points(
+        &mut self,
+        node: NodeIndex,
+        block: &BasicBlock,
+        live_out: &HashSet<SmolStr>,
+    ) {
         let mut kill_points = HashMap::new();
         let mut live = live_out.clone();
 
@@ -140,7 +171,12 @@ impl LivenessAnalyzer {
                     }
                     def_insert(target, &mut live);
                 }
-                Instruction::BinaryOp { target, left, right, .. } => {
+                Instruction::BinaryOp {
+                    target,
+                    left,
+                    right,
+                    ..
+                } => {
                     self.collect_variables(left, &mut live, &mut HashSet::new());
                     self.collect_variables(right, &mut live, &mut HashSet::new());
                     if !live.contains(target) {
@@ -148,7 +184,9 @@ impl LivenessAnalyzer {
                     }
                     def_insert(target, &mut live);
                 }
-                Instruction::UnaryOp { target, operand, .. } => {
+                Instruction::UnaryOp {
+                    target, operand, ..
+                } => {
                     self.collect_variables(operand, &mut live, &mut HashSet::new());
                     if !live.contains(target) {
                         kill_points.insert(target.clone(), idx);
@@ -177,7 +215,12 @@ impl LivenessAnalyzer {
                     use_insert(target, &mut live);
                     self.collect_variables(value, &mut live, &mut HashSet::new());
                 }
-                Instruction::IndexLoad { target, object, index, .. } => {
+                Instruction::IndexLoad {
+                    target,
+                    object,
+                    index,
+                    ..
+                } => {
                     self.collect_variables(object, &mut live, &mut HashSet::new());
                     self.collect_variables(index, &mut live, &mut HashSet::new());
                     if !live.contains(target) {
@@ -185,7 +228,12 @@ impl LivenessAnalyzer {
                     }
                     def_insert(target, &mut live);
                 }
-                Instruction::IndexStore { target, index, value, .. } => {
+                Instruction::IndexStore {
+                    target,
+                    index,
+                    value,
+                    ..
+                } => {
                     use_insert(target, &mut live);
                     self.collect_variables(index, &mut live, &mut HashSet::new());
                     self.collect_variables(value, &mut live, &mut HashSet::new());

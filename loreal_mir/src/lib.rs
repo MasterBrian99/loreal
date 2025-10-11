@@ -5,9 +5,11 @@ use std::collections::HashMap;
 
 pub mod anf;
 pub mod liveness;
+pub mod borrow;
 
 pub use anf::ANFTransformer;
 pub use liveness::LivenessAnalyzer;
+pub use borrow::BorrowInferencer;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
