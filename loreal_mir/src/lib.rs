@@ -4,8 +4,10 @@ use smol_str::SmolStr;
 use std::collections::HashMap;
 
 pub mod anf;
+pub mod liveness;
 
 pub use anf::ANFTransformer;
+pub use liveness::LivenessAnalyzer;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

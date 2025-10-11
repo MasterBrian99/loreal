@@ -191,6 +191,47 @@ impl ANFTransformer {
                 Expr::Identifier { name: temp, span }
             }
 
+            Expr::Block {
+                statements,
+                result,
+                span,
+            } => {
+                let mut transformed_statements = Vec::new();
+                for stmt in statements {
+                    match stmt {
+                        Statement::Let {
+                            pattern,
+                            type_annotation,
+                            value,
+                            span: stmt_span,
+                        } => {
+                            let transformed_value = self.transform(*value);
+                            transformed_statements.push(Statement::Let {
+                                pattern,
+                                type_annotation,
+                                value: Box::new(transformed_value),
+                                span: stmt_span,
+                            });
+                        }
+                        Statement::Expr { expr, span: stmt_span } => {
+                            let transformed_expr = self.transform(*expr);
+                            transformed_statements.push(Statement::Expr {
+                                expr: Box::new(transformed_expr),
+                                span: stmt_span,
+                            });
+                        }
+                    }
+                }
+
+                let transformed_result = self.transform(*result);
+
+                Expr::Block {
+                    statements: transformed_statements,
+                    result: Box::new(transformed_result),
+                    span,
+                }
+            }
+
             _ => expr,
         }
     }
