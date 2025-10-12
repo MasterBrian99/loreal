@@ -58,10 +58,15 @@ impl BorrowInferencer {
 
         let mut func_ownership = HashMap::new();
         for (param_name, is_used) in &param_usage {
-            let ownership = if *is_used { Ownership::Borrowed } else { Ownership::Owned };
+            let ownership = if *is_used {
+                Ownership::Borrowed
+            } else {
+                Ownership::Owned
+            };
             func_ownership.insert(param_name.clone(), ownership);
         }
-        self.param_ownership.insert(func.name.clone(), func_ownership);
+        self.param_ownership
+            .insert(func.name.clone(), func_ownership);
     }
 
     fn check_value(&self, val: &crate::Value, param_usage: &mut HashMap<SmolStr, bool>) {

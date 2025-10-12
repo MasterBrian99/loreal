@@ -6,10 +6,12 @@ use std::collections::HashMap;
 pub mod anf;
 pub mod liveness;
 pub mod borrow;
+pub mod reuse;
 
 pub use anf::ANFTransformer;
 pub use liveness::LivenessAnalyzer;
 pub use borrow::BorrowInferencer;
+pub use reuse::ReuseAnalyzer;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
