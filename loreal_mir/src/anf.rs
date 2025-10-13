@@ -232,6 +232,40 @@ impl ANFTransformer {
                 }
             }
 
+            Expr::If {
+                condition,
+                then_branch,
+                else_branch,
+                span,
+            } => {
+                let atomic_cond = self.transform(*condition);
+                let cond_expr = if self.is_atomic(&atomic_cond) {
+                    atomic_cond
+                } else {
+                    let t = self.new_temp(span);
+                    self.bindings.push(Statement::Let {
+                        pattern: ast::Pattern::Identifier {
+                            name: t.clone(),
+                            span,
+                        },
+                        type_annotation: None,
+                        value: Box::new(atomic_cond),
+                        span,
+                    });
+                    Expr::Identifier { name: t, span }
+                };
+
+                let then_expr = self.transform(*then_branch);
+                let else_expr = self.transform(*else_branch);
+
+                Expr::If {
+                    condition: Box::new(cond_expr),
+                    then_branch: Box::new(then_expr),
+                    else_branch: Box::new(else_expr),
+                    span,
+                }
+            }
+
             _ => expr,
         }
     }
