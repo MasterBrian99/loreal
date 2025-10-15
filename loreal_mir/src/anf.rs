@@ -266,6 +266,163 @@ impl ANFTransformer {
                 }
             }
 
+            Expr::StructLiteral { name, fields, span } => {
+                let mut atomic_fields = Vec::new();
+                for (field_name, field_expr) in fields {
+                    let atomic_field = self.transform(field_expr.clone());
+                    if self.is_atomic(&atomic_field) {
+                        atomic_fields.push((field_name.clone(), atomic_field));
+                    } else {
+                        let t = self.new_temp(span);
+                        self.bindings.push(Statement::Let {
+                            pattern: ast::Pattern::Identifier {
+                                name: t.clone(),
+                                span,
+                            },
+                            type_annotation: None,
+                            value: Box::new(atomic_field),
+                            span,
+                        });
+                        atomic_fields.push((field_name.clone(), Expr::Identifier { name: t, span }));
+                    }
+                }
+
+                let temp = self.new_temp(span);
+                let result_expr = Expr::StructLiteral {
+                    name: name.clone(),
+                    fields: atomic_fields,
+                    span,
+                };
+
+                self.bindings.push(Statement::Let {
+                    pattern: ast::Pattern::Identifier {
+                        name: temp.clone(),
+                        span,
+                    },
+                    type_annotation: None,
+                    value: Box::new(result_expr),
+                    span,
+                });
+
+                Expr::Identifier { name: temp, span }
+            }
+
+            Expr::Tuple { elements, span } => {
+                let mut atomic_elements = Vec::new();
+                for elem in elements {
+                    let atomic_elem = self.transform(elem.clone());
+                    if self.is_atomic(&atomic_elem) {
+                        atomic_elements.push(atomic_elem);
+                    } else {
+                        let t = self.new_temp(span);
+                        self.bindings.push(Statement::Let {
+                            pattern: ast::Pattern::Identifier {
+                                name: t.clone(),
+                                span,
+                            },
+                            type_annotation: None,
+                            value: Box::new(atomic_elem),
+                            span,
+                        });
+                        atomic_elements.push(Expr::Identifier { name: t, span });
+                    }
+                }
+
+                let temp = self.new_temp(span);
+                let result_expr = Expr::Tuple {
+                    elements: atomic_elements,
+                    span,
+                };
+
+                self.bindings.push(Statement::Let {
+                    pattern: ast::Pattern::Identifier {
+                        name: temp.clone(),
+                        span,
+                    },
+                    type_annotation: None,
+                    value: Box::new(result_expr),
+                    span,
+                });
+
+                Expr::Identifier { name: temp, span }
+            }
+
+            Expr::List { elements, span } => {
+                let mut atomic_elements = Vec::new();
+                for elem in elements {
+                    let atomic_elem = self.transform(elem.clone());
+                    if self.is_atomic(&atomic_elem) {
+                        atomic_elements.push(atomic_elem);
+                    } else {
+                        let t = self.new_temp(span);
+                        self.bindings.push(Statement::Let {
+                            pattern: ast::Pattern::Identifier {
+                                name: t.clone(),
+                                span,
+                            },
+                            type_annotation: None,
+                            value: Box::new(atomic_elem),
+                            span,
+                        });
+                        atomic_elements.push(Expr::Identifier { name: t, span });
+                    }
+                }
+
+                let temp = self.new_temp(span);
+                let result_expr = Expr::List {
+                    elements: atomic_elements,
+                    span,
+                };
+
+                self.bindings.push(Statement::Let {
+                    pattern: ast::Pattern::Identifier {
+                        name: temp.clone(),
+                        span,
+                    },
+                    type_annotation: None,
+                    value: Box::new(result_expr),
+                    span,
+                });
+
+                Expr::Identifier { name: temp, span }
+            }
+
+            Expr::Loop {
+                init_values,
+                loop_vars,
+                body,
+                span,
+            } => {
+                let mut atomic_inits = Vec::new();
+                for init in init_values {
+                    let atomic_init = self.transform(init.clone());
+                    if self.is_atomic(&atomic_init) {
+                        atomic_inits.push(atomic_init);
+                    } else {
+                        let t = self.new_temp(span);
+                        self.bindings.push(Statement::Let {
+                            pattern: ast::Pattern::Identifier {
+                                name: t.clone(),
+                                span,
+                            },
+                            type_annotation: None,
+                            value: Box::new(atomic_init),
+                            span,
+                        });
+                        atomic_inits.push(Expr::Identifier { name: t, span });
+                    }
+                }
+
+                let transformed_body = self.transform(*body);
+
+                Expr::Loop {
+                    init_values: atomic_inits,
+                    loop_vars,
+                    body: Box::new(transformed_body),
+                    span,
+                }
+            }
+
             _ => expr,
         }
     }
