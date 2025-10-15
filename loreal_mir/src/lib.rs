@@ -407,6 +407,160 @@ impl MirBuilder {
                 self.lower_expr(result)
             }
 
+            ast::Expr::StructLiteral { name, fields, span } => {
+                let mut field_values = Vec::new();
+                for (_field_name, field_expr) in fields {
+                    let (val, _) = self.lower_expr(field_expr);
+                    field_values.push(val);
+                }
+
+                let temp = self.new_temp(Type::Named {
+                    name: name.clone(),
+                    span: Span::new(0, 0),
+                });
+
+                self.emit(Instruction::Alloc {
+                    target: temp.clone(),
+                    ty: Type::Named {
+                        name: name.clone(),
+                        span: Span::new(0, 0),
+                    },
+                });
+
+                for (field_name, val) in fields.iter().zip(field_values.iter()) {
+                    self.emit(Instruction::FieldStore {
+                        target: temp.clone(),
+                        field: field_name.clone(),
+                        value: val.clone(),
+                    });
+                }
+
+                self.variables.insert(temp.clone(), Value::Var(temp.clone()));
+                (Value::Var(temp), Type::Named {
+                    name: name.clone(),
+                    span: Span::new(0, 0),
+                })
+            }
+
+            ast::Expr::FieldAccess { object, field, span } => {
+                let (obj_val, obj_ty) = self.lower_expr(object);
+                let temp = self.new_temp(Type::Named {
+                    name: "Unknown".into(),
+                    span: Span::new(0, 0),
+                });
+
+                self.emit(Instruction::FieldLoad {
+                    target: temp.clone(),
+                    object: obj_val,
+                    field: field.clone(),
+                });
+
+                let field_ty = if let Type::Named { name, .. } = &obj_ty {
+                    if let Some(def) = self.struct_types.get(name) {
+                        if let Some((_, ty)) = def.fields.iter().find(|(n, _)| n == field) {
+                            ty.clone()
+                        } else {
+                            Type::Named {
+                                name: "Unknown".into(),
+                                span: Span::new(0, 0),
+                            }
+                        }
+                    } else {
+                        Type::Named {
+                            name: "Unknown".into(),
+                            span: Span::new(0, 0),
+                        }
+                    }
+                } else {
+                    Type::Named {
+                        name: "Unknown".into(),
+                        span: Span::new(0, 0),
+                    }
+                };
+
+                (Value::Var(temp), field_ty)
+            }
+
+            ast::Expr::Tuple { elements, span } => {
+                let temp = self.new_temp(Type::Tuple {
+                    types: vec![Type::Named {
+                        name: "Unknown".into(),
+                        span: Span::new(0, 0),
+                    }; elements.len()],
+                    span: Span::new(0, 0),
+                });
+
+                self.emit(Instruction::Alloc {
+                    target: temp.clone(),
+                    ty: Type::Tuple {
+                        types: vec![],
+                        span: Span::new(0, 0),
+                    },
+                });
+
+                let (value, ty) = self.lower_expr(elements[0].clone());
+                self.emit(Instruction::IndexStore {
+                    target: temp.clone(),
+                    index: Value::IntConst(0),
+                    value,
+                });
+
+                (Value::Var(temp), ty)
+            }
+
+            ast::Expr::List { elements, span } => {
+                let temp = self.new_temp(Type::List {
+                    element_type: Box::new(Type::Named {
+                        name: "Unknown".into(),
+                        span: Span::new(0, 0),
+                    }),
+                    span: Span::new(0, 0),
+                });
+
+                self.emit(Instruction::AllocList {
+                    target: temp.clone(),
+                    element_type: Type::Named {
+                        name: "Unknown".into(),
+                        span: Span::new(0, 0),
+                    },
+                    length: Value::IntConst(elements.len() as i64),
+                });
+
+                (Value::Var(temp), Type::List {
+                    element_type: Box::new(Type::Named {
+                        name: "Unknown".into(),
+                        span: Span::new(0, 0),
+                    }),
+                    span: Span::new(0, 0),
+                })
+            }
+
+            ast::Expr::IndexAccess { object, index, span } => {
+                let (obj_val, obj_ty) = self.lower_expr(object);
+                let (idx_val, _) = self.lower_expr(index);
+                let temp = self.new_temp(Type::Named {
+                    name: "Unknown".into(),
+                    span: Span::new(0, 0),
+                });
+
+                self.emit(Instruction::IndexLoad {
+                    target: temp.clone(),
+                    object: obj_val,
+                    index: idx_val,
+                });
+
+                let elem_ty = if let Type::List { element_type, .. } = obj_ty {
+                    *element_type
+                } else {
+                    Type::Named {
+                        name: "Unknown".into(),
+                        span: Span::new(0, 0),
+                    }
+                };
+
+                (Value::Var(temp), elem_ty)
+            }
+
             _ => (
                 Value::NilConst,
                 Type::Named {
