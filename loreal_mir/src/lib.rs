@@ -561,6 +561,56 @@ impl MirBuilder {
                 (Value::Var(temp), elem_ty)
             }
 
+            ast::Expr::FunctionCall { func, args, span } => {
+                let atomic_func = self.lower_expr(*func);
+                let mut arg_values = Vec::new();
+                for arg in args {
+                    let (val, _) = self.lower_expr(arg);
+                    arg_values.push(val);
+                }
+
+                let func_name = if let Expr::Identifier { name, .. } = atomic_func.0 {
+                    name.clone()
+                } else {
+                    "unknown".into()
+                };
+
+                let ret_ty = Type::Named {
+                    name: "Int".into(),
+                    span: Span::new(0, 0),
+                };
+
+                let temp = self.new_temp(ret_ty.clone());
+
+                self.emit(Instruction::Call {
+                    target: Some(temp.clone()),
+                    func: func_name,
+                    args: arg_values,
+                });
+
+                (Value::Var(temp), ret_ty)
+            }
+
+            ast::Expr::Loop {
+                init_values,
+                loop_vars,
+                body,
+                span,
+            } => {
+                for (var_name, init_val) in loop_vars.iter().zip(init_values.iter()) {
+                    let (val, ty) = self.lower_expr(init_val);
+                    self.emit(Instruction::Assign {
+                        target: var_name.clone(),
+                        value: val,
+                    });
+                    self.variables.insert(var_name.clone(), Value::Var(var_name.clone()));
+                    self.local_types.insert(var_name.clone(), ty);
+                }
+
+                let (body_val, body_ty) = self.lower_expr(body);
+                (body_val, body_ty)
+            }
+
             _ => (
                 Value::NilConst,
                 Type::Named {
