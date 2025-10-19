@@ -82,4 +82,120 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             })
         }
     }
+
+    pub fn parse(&mut self) -> Result<Module, Vec<ParseError>> {
+        let mut declarations = Vec::new();
+
+        while self.peek().is_some() {
+            if let Some(decl) = self.parse_declaration() {
+                declarations.push(decl);
+            } else {
+                self.advance();
+            }
+        }
+
+        Ok(Module {
+            declarations,
+            span: Span::new(0, 0),
+        })
+    }
+
+    fn parse_declaration(&mut self) -> Option<Declaration> {
+        match self.peek() {
+            Some(TokenKind::Fn) => self.parse_function(),
+            Some(TokenKind::Struct) => self.parse_struct(),
+            _ => {
+                self.errors.push(ParseError::UnexpectedToken {
+                    expected: "fn or struct".to_string(),
+                    found: self.current.clone().unwrap_or(Token::new(TokenKind::Eof, Span::new(0, 0))),
+                });
+                None
+            }
+        }
+    }
+
+    fn parse_function(&mut self) -> Option<Declaration> {
+        self.expect(TokenKind::Fn).ok()?;
+        let name = self.expect_identifier()?;
+
+        self.expect(TokenKind::LParen).ok()?;
+        let params = self.parse_params()?;
+        self.expect(TokenKind::RParen).ok()?;
+
+        let return_type = if self.check(&TokenKind::Arrow) {
+            self.expect(TokenKind::Arrow).ok()?;
+            self.parse_type()
+        } else {
+            Type::Named {
+                name: "Nil".into(),
+                span: Span::new(0, 0),
+            }
+        };
+
+        self.expect(TokenKind::Do).ok()?;
+        let body = self.parse_expr()?;
+        self.expect(TokenKind::End).ok()?;
+
+        Some(Declaration::Function(FunctionDef {
+            name,
+            params,
+            return_type,
+            body,
+            span: Span::new(0, 0),
+        }))
+    }
+
+    fn parse_struct(&mut self) -> Option<Declaration> {
+        self.expect(TokenKind::Struct).ok()?;
+        let name = self.expect_identifier()?;
+        self.expect(TokenKind::LBrace).ok()?;
+
+        let mut fields = Vec::new();
+        while !self.check(&TokenKind::RBrace) && self.peek().is_some() {
+            let field_name = self.expect_identifier()?;
+            self.expect(TokenKind::Colon).ok()?;
+            let field_type = self.parse_type();
+            fields.push((field_name, field_type));
+
+            if !self.check(&TokenKind::RBrace) {
+                self.expect(TokenKind::Comma).ok();
+            }
+        }
+
+        self.expect(TokenKind::RBrace).ok()?;
+
+        Some(Declaration::Struct(StructDef {
+            name,
+            fields,
+            span: Span::new(0, 0),
+        }))
+    }
+
+    fn expect_identifier(&mut self) -> Option<SmolStr> {
+        match self.current.as_ref() {
+            Some(Token { kind: TokenKind::Identifier(name), .. }) => {
+                let name = name.clone();
+                self.advance();
+                Some(name)
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_params(&mut self) -> Option<Vec<(Pattern, Type)>> {
+        let mut params = Vec::new();
+
+        while !self.check(&TokenKind::RParen) && self.peek().is_some() {
+            let pattern = self.parse_pattern()?;
+            self.expect(TokenKind::Colon).ok()?;
+            let ty = self.parse_type();
+            params.push((pattern, ty));
+
+            if !self.check(&TokenKind::RParen) {
+                self.expect(TokenKind::Comma).ok();
+            }
+        }
+
+        Some(params)
+    }
 }
