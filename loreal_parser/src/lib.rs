@@ -107,7 +107,10 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             _ => {
                 self.errors.push(ParseError::UnexpectedToken {
                     expected: "fn or struct".to_string(),
-                    found: self.current.clone().unwrap_or(Token::new(TokenKind::Eof, Span::new(0, 0))),
+                    found: self
+                        .current
+                        .clone()
+                        .unwrap_or(Token::new(TokenKind::Eof, Span::new(0, 0))),
                 });
                 None
             }
@@ -173,7 +176,10 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
 
     fn expect_identifier(&mut self) -> Option<SmolStr> {
         match self.current.as_ref() {
-            Some(Token { kind: TokenKind::Identifier(name), .. }) => {
+            Some(Token {
+                kind: TokenKind::Identifier(name),
+                ..
+            }) => {
                 let name = name.clone();
                 self.advance();
                 Some(name)
@@ -197,5 +203,62 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
         }
 
         Some(params)
+    }
+
+    fn parse_type(&mut self) -> Type {
+        match self.peek() {
+            Some(TokenKind::Identifier(_)) => {
+                let name = self.expect_identifier().unwrap();
+                Type::Named {
+                    name,
+                    span: Span::new(0, 0),
+                }
+            }
+            Some(TokenKind::LBracket) => {
+                self.expect(TokenKind::LBracket).ok();
+                let elem_type = self.parse_type();
+                self.expect(TokenKind::RBracket).ok();
+                Type::List {
+                    element_type: Box::new(elem_type),
+                    span: Span::new(0, 0),
+                }
+            }
+            Some(TokenKind::LParen) => {
+                self.expect(TokenKind::LParen).ok();
+                let mut types = Vec::new();
+                while !self.check(&TokenKind::RParen) && self.peek().is_some() {
+                    types.push(self.parse_type());
+                    if !self.check(&TokenKind::RParen) {
+                        self.expect(TokenKind::Comma).ok();
+                    }
+                }
+                self.expect(TokenKind::RParen).ok();
+                Type::Tuple {
+                    types,
+                    span: Span::new(0, 0),
+                }
+            }
+            _ => Type::Named {
+                name: "Unknown".into(),
+                span: Span::new(0, 0),
+            },
+        }
+    }
+
+    fn parse_pattern(&mut self) -> Option<Pattern> {
+        match self.peek() {
+            Some(TokenKind::Identifier(_)) => {
+                let name = self.expect_identifier()?;
+                Some(Pattern::Identifier {
+                    name,
+                    span: Span::new(0, 0),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_expr(&mut self) -> Option<Expr> {
+        self.parse_binary_op(0)
     }
 }
