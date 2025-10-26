@@ -261,4 +261,119 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
     fn parse_expr(&mut self) -> Option<Expr> {
         self.parse_binary_op(0)
     }
+
+    fn parse_binary_op(&mut self, precedence: u8) -> Option<Expr> {
+        let mut left = self.parse_unary_op()?;
+
+        loop {
+            let op_prec = self.peek_precedence();
+            if op_prec < precedence {
+                break;
+            }
+
+            let op = match self.peek() {
+                Some(TokenKind::Plus) => BinOp::Add,
+                Some(TokenKind::Minus) => BinOp::Sub,
+                Some(TokenKind::Star) => BinOp::Mul,
+                Some(TokenKind::Slash) => BinOp::Div,
+                Some(TokenKind::Percent) => BinOp::Mod,
+                Some(TokenKind::EqEq) => BinOp::Eq,
+                Some(TokenKind::Neq) => BinOp::Ne,
+                Some(TokenKind::Lt) => BinOp::Lt,
+                Some(TokenKind::Le) => BinOp::Le,
+                Some(TokenKind::Gt) => BinOp::Gt,
+                Some(TokenKind::Ge) => BinOp::Ge,
+                Some(TokenKind::And) => BinOp::And,
+                Some(TokenKind::Or) => BinOp::Or,
+                Some(TokenKind::Pipe) => BinOp::Pipe,
+                _ => break,
+            };
+
+            self.advance().ok()?;
+            let right = self.parse_binary_op(op_prec + 1)?;
+            left = Expr::BinaryOp {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+                span: Span::new(0, 0),
+            };
+        }
+
+        Some(left)
+    }
+
+    fn peek_precedence(&self) -> u8 {
+        match self.peek() {
+            Some(TokenKind::Or) => 1,
+            Some(TokenKind::And) => 2,
+            Some(TokenKind::EqEq) | Some(TokenKind::Neq) => 3,
+            Some(TokenKind::Lt) | Some(TokenKind::Le) | Some(TokenKind::Gt) | Some(TokenKind::Ge) => 4,
+            Some(TokenKind::Plus) | Some(TokenKind::Minus) => 5,
+            Some(TokenKind::Star) | Some(TokenKind::Slash) | Some(TokenKind::Percent) => 6,
+            Some(TokenKind::Pipe) => 7,
+            _ => 0,
+        }
+    }
+
+    fn parse_unary_op(&mut self) -> Option<Expr> {
+        if self.check(&TokenKind::Minus) {
+            self.advance().ok()?;
+            let operand = self.parse_unary_op()?;
+            Some(Expr::UnaryOp {
+                op: UnOp::Neg,
+                operand: Box::new(operand),
+                span: Span::new(0, 0),
+            })
+        } else if self.check(&TokenKind::Not) {
+            self.advance().ok()?;
+            let operand = self.parse_unary_op()?;
+            Some(Expr::UnaryOp {
+                op: UnOp::Not,
+                operand: Box::new(operand),
+                span: Span::new(0, 0),
+            })
+        } else {
+            self.parse_primary()
+        }
+    }
+
+    fn parse_primary(&mut self) -> Option<Expr> {
+        match self.peek() {
+            Some(TokenKind::IntLiteral(value)) => {
+                let value = *value;
+                self.advance().ok()?;
+                Some(Expr::IntLiteral { value, span: Span::new(0, 0) })
+            }
+            Some(TokenKind::FloatLiteral(value)) => {
+                let value = *value;
+                self.advance().ok()?;
+                Some(Expr::FloatLiteral { value, span: Span::new(0, 0) })
+            }
+            Some(TokenKind::BoolLiteral(value)) => {
+                let value = *value;
+                self.advance().ok()?;
+                Some(Expr::BoolLiteral { value, span: Span::new(0, 0) })
+            }
+            Some(TokenKind::CharLiteral(value)) => {
+                let value = *value;
+                self.advance().ok()?;
+                Some(Expr::CharLiteral { value, span: Span::new(0, 0) })
+            }
+            Some(TokenKind::StringLiteral(value)) => {
+                let value = value.clone();
+                self.advance().ok()?;
+                Some(Expr::StringLiteral { value, span: Span::new(0, 0) })
+            }
+            Some(TokenKind::Identifier(_)) => {
+                let name = self.expect_identifier()?;
+                Some(Expr::Identifier { name, span: Span::new(0, 0) })
+            }
+            Some(TokenKind::If) => self.parse_if(),
+            Some(TokenKind::Do) => self.parse_block(),
+            Some(TokenKind::LParen) => self.parse_tuple(),
+            Some(TokenKind::LBracket) => self.parse_list(),
+            Some(TokenKind::Loop) => self.parse_loop(),
+            _ => None,
+        }
+    }
 }
