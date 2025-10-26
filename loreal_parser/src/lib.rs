@@ -307,7 +307,8 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             Some(TokenKind::Or) => 1,
             Some(TokenKind::And) => 2,
             Some(TokenKind::EqEq) | Some(TokenKind::Neq) => 3,
-            Some(TokenKind::Lt) | Some(TokenKind::Le) | Some(TokenKind::Gt) | Some(TokenKind::Ge) => 4,
+            Some(TokenKind::Lt) | Some(TokenKind::Le) | Some(TokenKind::Gt)
+            | Some(TokenKind::Ge) => 4,
             Some(TokenKind::Plus) | Some(TokenKind::Minus) => 5,
             Some(TokenKind::Star) | Some(TokenKind::Slash) | Some(TokenKind::Percent) => 6,
             Some(TokenKind::Pipe) => 7,
@@ -342,31 +343,49 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             Some(TokenKind::IntLiteral(value)) => {
                 let value = *value;
                 self.advance().ok()?;
-                Some(Expr::IntLiteral { value, span: Span::new(0, 0) })
+                Some(Expr::IntLiteral {
+                    value,
+                    span: Span::new(0, 0),
+                })
             }
             Some(TokenKind::FloatLiteral(value)) => {
                 let value = *value;
                 self.advance().ok()?;
-                Some(Expr::FloatLiteral { value, span: Span::new(0, 0) })
+                Some(Expr::FloatLiteral {
+                    value,
+                    span: Span::new(0, 0),
+                })
             }
             Some(TokenKind::BoolLiteral(value)) => {
                 let value = *value;
                 self.advance().ok()?;
-                Some(Expr::BoolLiteral { value, span: Span::new(0, 0) })
+                Some(Expr::BoolLiteral {
+                    value,
+                    span: Span::new(0, 0),
+                })
             }
             Some(TokenKind::CharLiteral(value)) => {
                 let value = *value;
                 self.advance().ok()?;
-                Some(Expr::CharLiteral { value, span: Span::new(0, 0) })
+                Some(Expr::CharLiteral {
+                    value,
+                    span: Span::new(0, 0),
+                })
             }
             Some(TokenKind::StringLiteral(value)) => {
                 let value = value.clone();
                 self.advance().ok()?;
-                Some(Expr::StringLiteral { value, span: Span::new(0, 0) })
+                Some(Expr::StringLiteral {
+                    value,
+                    span: Span::new(0, 0),
+                })
             }
             Some(TokenKind::Identifier(_)) => {
                 let name = self.expect_identifier()?;
-                Some(Expr::Identifier { name, span: Span::new(0, 0) })
+                Some(Expr::Identifier {
+                    name,
+                    span: Span::new(0, 0),
+                })
             }
             Some(TokenKind::If) => self.parse_if(),
             Some(TokenKind::Do) => self.parse_block(),
@@ -374,6 +393,139 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             Some(TokenKind::LBracket) => self.parse_list(),
             Some(TokenKind::Loop) => self.parse_loop(),
             _ => None,
+        }
+    }
+
+    fn parse_if(&mut self) -> Option<Expr> {
+        self.expect(TokenKind::If).ok()?;
+        let condition = self.parse_expr()?;
+        self.expect(TokenKind::Then).ok()?;
+        let then_branch = self.parse_expr()?;
+        self.expect(TokenKind::Else).ok()?;
+        let else_branch = self.parse_expr()?;
+        Some(Expr::If {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch: Box::new(else_branch),
+            span: Span::new(0, 0),
+        })
+    }
+
+    fn parse_block(&mut self) -> Option<Expr> {
+        self.expect(TokenKind::Do).ok()?;
+        let mut statements = Vec::new();
+
+        while !self.check(&TokenKind::End) && !self.check(&TokenKind::Else) && self.peek().is_some() {
+            if let Some(stmt) = self.parse_statement() {
+                statements.push(stmt);
+            }
+        }
+
+        let result = self.parse_expr()?;
+        self.expect(TokenKind::End).ok()?;
+
+        Some(Expr::Block {
+            statements,
+            result: Box::new(result),
+            span: Span::new(0, 0),
+        })
+    }
+
+    fn parse_tuple(&mut self) -> Option<Expr> {
+        self.expect(TokenKind::LParen).ok()?;
+        let mut elements = Vec::new();
+
+        while !self.check(&TokenKind::RParen) && self.peek().is_some() {
+            elements.push(self.parse_expr()?);
+            if !self.check(&TokenKind::RParen) {
+                self.expect(TokenKind::Comma).ok();
+            }
+        }
+
+        self.expect(TokenKind::RParen).ok()?;
+        Some(Expr::Tuple {
+            elements,
+            span: Span::new(0, 0),
+        })
+    }
+
+    fn parse_list(&mut self) -> Option<Expr> {
+        self.expect(TokenKind::LBracket).ok()?;
+        let mut elements = Vec::new();
+
+        while !self.check(&TokenKind::RBracket) && self.peek().is_some() {
+            elements.push(self.parse_expr()?);
+            if !self.check(&TokenKind::RBracket) {
+                self.expect(TokenKind::Comma).ok();
+            }
+        }
+
+        self.expect(TokenKind::RBracket).ok()?;
+        Some(Expr::List {
+            elements,
+            span: Span::new(0, 0),
+        })
+    }
+
+    fn parse_loop(&mut self) -> Option<Expr> {
+        self.expect(TokenKind::Loop).ok()?;
+        let mut init_values = Vec::new();
+        let mut loop_vars = Vec::new();
+
+        while !self.check(&TokenKind::Colon) && self.peek().is_some() {
+            let init = self.parse_expr()?;
+            init_values.push(init);
+
+            if self.check(&TokenKind::Comma) {
+                self.advance().ok()?;
+            }
+        }
+
+        self.expect(TokenKind::Colon).ok()?;
+        while !self.check(&TokenKind::Do) && self.peek().is_some() {
+            let var = self.expect_identifier()?;
+            loop_vars.push(var);
+            if self.check(&TokenKind::Comma) {
+                self.advance().ok()?;
+            }
+        }
+
+        self.expect(TokenKind::Do).ok()?;
+        let body = self.parse_expr()?;
+        self.expect(TokenKind::End).ok()?;
+
+        Some(Expr::Loop {
+            init_values,
+            loop_vars,
+            body: Box::new(body),
+            span: Span::new(0, 0),
+        })
+    }
+
+    fn parse_statement(&mut self) -> Option<Statement> {
+        if self.check(&TokenKind::Let) {
+            self.expect(TokenKind::Let).ok()?;
+            let pattern = self.parse_pattern()?;
+            let type_annotation = if self.check(&TokenKind::Colon) {
+                self.expect(TokenKind::Colon).ok()?;
+                Some(self.parse_type())
+            } else {
+                None
+            };
+            self.expect(TokenKind::Assign).ok()?;
+            let value = self.parse_expr()?;
+            Some(Statement::Let {
+                pattern,
+                type_annotation,
+                value: Box::new(value),
+                span: Span::new(0, 0),
+            })
+        } else {
+            let expr = self.parse_expr()?;
+            Some(Statement::Expr {
+                expr: Box::new(expr),
+                span: Span::new(0, 0),
+            })
         }
     }
 }
