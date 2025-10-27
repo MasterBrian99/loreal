@@ -415,7 +415,8 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
         self.expect(TokenKind::Do).ok()?;
         let mut statements = Vec::new();
 
-        while !self.check(&TokenKind::End) && !self.check(&TokenKind::Else) && self.peek().is_some() {
+        while !self.check(&TokenKind::End) && !self.check(&TokenKind::Else) && self.peek().is_some()
+        {
             if let Some(stmt) = self.parse_statement() {
                 statements.push(stmt);
             }
