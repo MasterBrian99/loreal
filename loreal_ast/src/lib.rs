@@ -13,12 +13,30 @@ pub struct Module {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Import {
-    pub module_path: SmolStr,
-    pub items: Option<Vec<SmolStr>>,
-    pub span: Span,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    Pipe,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnOp {
+    Neg,
+    Not,
+}
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
