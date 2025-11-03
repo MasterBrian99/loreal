@@ -13,23 +13,97 @@ pub struct Module {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BinOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-    And,
-    Or,
-    Pipe,
+#[derive(Debug, Clone, PartialEq)]
+pub enum Expr {
+    IntLiteral { value: i64, span: Span },
+    FloatLiteral { value: f64, span: Span },
+    BoolLiteral { value: bool, span: Span },
+    CharLiteral { value: char, span: Span },
+    StringLiteral { value: SmolStr, span: Span },
+    NilLiteral { span: Span },
+    Identifier { name: SmolStr, span: Span },
+    FunctionCall { func: Box<Expr>, args: Vec<Expr>, span: Span },
+    Lambda {
+        params: Vec<Pattern>,
+        return_type: Option<Type>,
+        body: Box<Expr>,
+        span: Span,
+    },
+    BinaryOp {
+        op: BinOp,
+        left: Box<Expr>,
+        right: Box<Expr>,
+        span: Span,
+    },
+    UnaryOp { op: UnOp, operand: Box<Expr>, span: Span },
+    If {
+        condition: Box<Expr>,
+        then_branch: Box<Expr>,
+        else_branch: Box<Expr>,
+        span: Span,
+    },
+    Match {
+        scrutinee: Box<Expr>,
+        arms: Vec<MatchArm>,
+        span: Span,
+    },
+    List { elements: Vec<Expr>, span: Span },
+    Tuple { elements: Vec<Expr>, span: Span },
+    Map { pairs: Vec<(Expr, Expr)>, span: Span },
+    StructLiteral {
+        name: SmolStr,
+        fields: Vec<(SmolStr, Expr)>,
+        span: Span,
+    },
+    FieldAccess { object: Box<Expr>, field: SmolStr, span: Span },
+    IndexAccess { object: Box<Expr>, index: Box<Expr>, span: Span },
+    Pipe { left: Box<Expr>, right: Box<Expr>, span: Span },
+    Block {
+        statements: Vec<Statement>,
+        result: Box<Expr>,
+        span: Span,
+    },
+    Loop {
+        init_values: Vec<Expr>,
+        loop_vars: Vec<SmolStr>,
+        body: Box<Expr>,
+        span: Span,
+    },
+    Next { values: Vec<Expr>, span: Span },
+    Break { value: Box<Expr>, span: Span },
 }
+
+impl Expr {
+    pub fn span(&self) -> Span {
+        match self {
+            Expr::IntLiteral { span, .. } => *span,
+            Expr::FloatLiteral { span, .. } => *span,
+            Expr::BoolLiteral { span, .. } => *span,
+            Expr::CharLiteral { span, .. } => *span,
+            Expr::StringLiteral { span, .. } => *span,
+            Expr::NilLiteral { span } => *span,
+            Expr::Identifier { span, .. } => *span,
+            Expr::FunctionCall { span, .. } => *span,
+            Expr::Lambda { span, .. } => *span,
+            Expr::BinaryOp { span, .. } => *span,
+            Expr::UnaryOp { span, .. } => *span,
+            Expr::If { span, .. } => *span,
+            Expr::Match { span, .. } => *span,
+            Expr::List { span, .. } => *span,
+            Expr::Tuple { span, .. } => *span,
+            Expr::Map { span, .. } => *span,
+            Expr::StructLiteral { span, .. } => *span,
+            Expr::FieldAccess { span, .. } => *span,
+            Expr::IndexAccess { span, .. } => *span,
+            Expr::Pipe { span, .. } => *span,
+            Expr::Block { span, .. } => *span,
+            Expr::Loop { span, .. } => *span,
+            Expr::Next { span, .. } => *span,
+            Expr::Break { span, .. } => *span,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOp {
@@ -45,15 +119,29 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
-    Expr { expr: Expr, span: Span },
+    Expr {
+        expr: Expr,
+        span: Span,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
-    Wildcard { span: Span },
-    Identifier { name: SmolStr, span: Span },
-    Literal { expr: Expr, span: Span },
-    Tuple { patterns: Vec<Pattern>, span: Span },
+    Wildcard {
+        span: Span,
+    },
+    Identifier {
+        name: SmolStr,
+        span: Span,
+    },
+    Literal {
+        expr: Expr,
+        span: Span,
+    },
+    Tuple {
+        patterns: Vec<Pattern>,
+        span: Span,
+    },
     Struct {
         name: SmolStr,
         fields: Vec<(SmolStr, Pattern)>,
@@ -75,14 +163,23 @@ impl Pattern {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    Named { name: SmolStr, span: Span },
+    Named {
+        name: SmolStr,
+        span: Span,
+    },
     Function {
         params: Vec<Type>,
         return_type: Box<Type>,
         span: Span,
     },
-    List { element_type: Box<Type>, span: Span },
-    Tuple { types: Vec<Type>, span: Span },
+    List {
+        element_type: Box<Type>,
+        span: Span,
+    },
+    Tuple {
+        types: Vec<Type>,
+        span: Span,
+    },
     Map {
         key_type: Box<Type>,
         value_type: Box<Type>,
