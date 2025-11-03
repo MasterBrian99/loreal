@@ -15,14 +15,38 @@ pub struct Module {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    IntLiteral { value: i64, span: Span },
-    FloatLiteral { value: f64, span: Span },
-    BoolLiteral { value: bool, span: Span },
-    CharLiteral { value: char, span: Span },
-    StringLiteral { value: SmolStr, span: Span },
-    NilLiteral { span: Span },
-    Identifier { name: SmolStr, span: Span },
-    FunctionCall { func: Box<Expr>, args: Vec<Expr>, span: Span },
+    IntLiteral {
+        value: i64,
+        span: Span,
+    },
+    FloatLiteral {
+        value: f64,
+        span: Span,
+    },
+    BoolLiteral {
+        value: bool,
+        span: Span,
+    },
+    CharLiteral {
+        value: char,
+        span: Span,
+    },
+    StringLiteral {
+        value: SmolStr,
+        span: Span,
+    },
+    NilLiteral {
+        span: Span,
+    },
+    Identifier {
+        name: SmolStr,
+        span: Span,
+    },
+    FunctionCall {
+        func: Box<Expr>,
+        args: Vec<Expr>,
+        span: Span,
+    },
     Lambda {
         params: Vec<Pattern>,
         return_type: Option<Type>,
@@ -35,7 +59,11 @@ pub enum Expr {
         right: Box<Expr>,
         span: Span,
     },
-    UnaryOp { op: UnOp, operand: Box<Expr>, span: Span },
+    UnaryOp {
+        op: UnOp,
+        operand: Box<Expr>,
+        span: Span,
+    },
     If {
         condition: Box<Expr>,
         then_branch: Box<Expr>,
@@ -47,17 +75,38 @@ pub enum Expr {
         arms: Vec<MatchArm>,
         span: Span,
     },
-    List { elements: Vec<Expr>, span: Span },
-    Tuple { elements: Vec<Expr>, span: Span },
-    Map { pairs: Vec<(Expr, Expr)>, span: Span },
+    List {
+        elements: Vec<Expr>,
+        span: Span,
+    },
+    Tuple {
+        elements: Vec<Expr>,
+        span: Span,
+    },
+    Map {
+        pairs: Vec<(Expr, Expr)>,
+        span: Span,
+    },
     StructLiteral {
         name: SmolStr,
         fields: Vec<(SmolStr, Expr)>,
         span: Span,
     },
-    FieldAccess { object: Box<Expr>, field: SmolStr, span: Span },
-    IndexAccess { object: Box<Expr>, index: Box<Expr>, span: Span },
-    Pipe { left: Box<Expr>, right: Box<Expr>, span: Span },
+    FieldAccess {
+        object: Box<Expr>,
+        field: SmolStr,
+        span: Span,
+    },
+    IndexAccess {
+        object: Box<Expr>,
+        index: Box<Expr>,
+        span: Span,
+    },
+    Pipe {
+        left: Box<Expr>,
+        right: Box<Expr>,
+        span: Span,
+    },
     Block {
         statements: Vec<Statement>,
         result: Box<Expr>,
@@ -69,8 +118,14 @@ pub enum Expr {
         body: Box<Expr>,
         span: Span,
     },
-    Next { values: Vec<Expr>, span: Span },
-    Break { value: Box<Expr>, span: Span },
+    Next {
+        values: Vec<Expr>,
+        span: Span,
+    },
+    Break {
+        value: Box<Expr>,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -103,7 +158,6 @@ impl Expr {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOp {

@@ -38,6 +38,9 @@ pub enum TokenKind {
     Loop,
     Next,
     Break,
+    Then,
+    Case,
+    Match,
 
     // Identifiers and Literals
     Identifier(SmolStr),
