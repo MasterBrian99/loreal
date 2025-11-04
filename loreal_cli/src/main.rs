@@ -19,6 +19,15 @@ enum Commands {
 
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        #[arg(long)]
+        emit_ast: bool,
+
+        #[arg(long)]
+        emit_mir: bool,
+
+        #[arg(short = 'O', long, default_value = "0")]
+        opt_level: u8,
     },
 
     Run {
