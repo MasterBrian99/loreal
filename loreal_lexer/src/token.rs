@@ -1,7 +1,6 @@
 use loreal_ast::span::Span;
 use smol_str::SmolStr;
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
