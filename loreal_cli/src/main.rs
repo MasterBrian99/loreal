@@ -76,6 +76,11 @@ fn main() -> Result<()> {
                 }
             };
 
+            if emit_ast {
+                println!("\n📄 Abstract Syntax Tree:");
+                println!("{:#?}", module);
+            }
+
             println!("🔍 Type checking...");
             let mut type_checker = loreal_semantic::TypeChecker::new();
 
