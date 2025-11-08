@@ -141,9 +141,30 @@ fn main() -> Result<()> {
 
             println!("✓ Lowered {} function(s) to MIR", mir_functions.len());
 
+            if emit_mir {
+                println!("\n📊 Mid-Level IR:");
+                for mir_func in &mir_functions {
+                    println!("\nFunction: {}", mir_func.name);
+                    println!("  Parameters: {:?}", mir_func.params.iter().map(|(n, _)| n).collect::<Vec<_>>());
+                    println!("  Blocks: {}", mir_func.cfg.node_count());
+                    println!("  Edges: {}", mir_func.cfg.edge_count());
+
+                    for node_idx in mir_func.cfg.node_indices() {
+                        if let Some(block) = mir_func.cfg.node_weight(node_idx) {
+                            println!("\n  Block {}:", block.id);
+                            for instr in &block.instructions {
+                                println!("    {:?}", instr);
+                            }
+                            println!("    Terminator: {:?}", block.terminator);
+                        }
+                    }
+                }
+            }
+
             let executable = output.unwrap_or_else(|| "a.out".into());
             println!("\n✓ Compilation successful!");
             println!("  Output: {}", executable.display());
+            println!("  Optimization level: {}", opt_level);
 
             Ok(())
         }
