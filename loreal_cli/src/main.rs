@@ -145,7 +145,10 @@ fn main() -> Result<()> {
                 println!("\n📊 Mid-Level IR:");
                 for mir_func in &mir_functions {
                     println!("\nFunction: {}", mir_func.name);
-                    println!("  Parameters: {:?}", mir_func.params.iter().map(|(n, _)| n).collect::<Vec<_>>());
+                    println!(
+                        "  Parameters: {:?}",
+                        mir_func.params.iter().map(|(n, _)| n).collect::<Vec<_>>()
+                    );
                     println!("  Blocks: {}", mir_func.cfg.node_count());
                     println!("  Edges: {}", mir_func.cfg.edge_count());
 
