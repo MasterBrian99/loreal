@@ -1,5 +1,6 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::os::raw::c_void;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[repr(C)]
 pub struct LorealValue {
@@ -7,18 +8,55 @@ pub struct LorealValue {
     pub data: *mut c_void,
 }
 
+#[repr(C)]
+pub struct RcHeader {
+    pub ref_count: AtomicUsize,
+}
+
 #[no_mangle]
 pub extern "C" fn loreal_alloc(size: usize) -> *mut c_void {
     unsafe {
-        let layout = Layout::from_size_align_unchecked(size, 8);
-        System.alloc(layout) as *mut c_void
+        let header_size = std::mem::size_of::<RcHeader>();
+        let total_size = header_size + size;
+        let layout = Layout::from_size_align_unchecked(total_size, 8);
+        let ptr = System.alloc(layout) as *mut u8;
+
+        let header = ptr as *mut RcHeader;
+        (*header).ref_count.store(1, Ordering::SeqCst);
+
+        (ptr.add(header_size)) as *mut c_void
     }
 }
 
 #[no_mangle]
 pub extern "C" fn loreal_free(ptr: *mut c_void, size: usize) {
     unsafe {
-        let layout = Layout::from_size_align_unchecked(size, 8);
-        System.dealloc(ptr as *mut u8, layout);
+        let header_size = std::mem::size_of::<RcHeader>();
+        let total_size = header_size + size;
+        let layout = Layout::from_size_align_unchecked(total_size, 8);
+
+        let ptr_with_header = (ptr as *mut u8).sub(header_size);
+        System.dealloc(ptr_with_header, layout);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn loreal_inc_rc(ptr: *mut c_void) {
+    unsafe {
+        let header_size = std::mem::size_of::<RcHeader>();
+        let header = (ptr as *mut u8).sub(header_size) as *mut RcHeader;
+
+        (*header).ref_count.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn loreal_dec_rc(ptr: *mut c_void) -> bool {
+    unsafe {
+        let header_size = std::mem::size_of::<RcHeader>();
+        let header = (ptr as *mut u8).sub(header_size) as *mut RcHeader;
+
+        let old_count = (*header).ref_count.fetch_sub(1, Ordering::SeqCst);
+        old_count == 1
     }
 }
