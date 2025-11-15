@@ -611,6 +611,59 @@ impl MirBuilder {
                 (body_val, body_ty)
             }
 
+            ast::Expr::Match {
+                scrutinee,
+                arms,
+                span,
+            } => {
+                let (scrutinee_val, scrutinee_ty) = self.lower_expr(scrutinee);
+                let temp = self.new_temp(scrutinee_ty.clone());
+
+                self.emit(Instruction::Assign {
+                    target: temp.clone(),
+                    value: scrutinee_val,
+                });
+
+                let result_ty = Type::Named {
+                    name: "Int".into(),
+                    span: Span::new(0, 0),
+                };
+
+                (Value::Var(temp), result_ty)
+            }
+
+            ast::Expr::Next { values, span } => {
+                let mut value_values = Vec::new();
+                for val in values {
+                    let (v, _) = self.lower_expr(val);
+                    value_values.push(v);
+                }
+
+                (Value::NilConst, Type::Named {
+                    name: "Nil".into(),
+                    span: Span::new(0, 0),
+                })
+            }
+
+            ast::Expr::Break { value, span } => {
+                let (val, ty) = self.lower_expr(value);
+                (val, ty)
+            }
+
+            ast::Expr::Pipe { left, right, span } => {
+                let (left_val, left_ty) = self.lower_expr(left);
+                let (right_val, _) = self.lower_expr(right);
+
+                let temp = self.new_temp(left_ty.clone());
+
+                self.emit(Instruction::Assign {
+                    target: temp.clone(),
+                    value: left_val,
+                });
+
+                (Value::Var(temp), left_ty)
+            }
+
             _ => (
                 Value::NilConst,
                 Type::Named {

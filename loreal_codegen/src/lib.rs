@@ -27,7 +27,11 @@ impl CodeGenerator {
         Err(CodegenError::GenerationError("Not implemented".into()))
     }
 
-    pub fn emit_llvm_ir(&self, functions: &[MirFunction], output: &str) -> Result<(), CodegenError> {
+    pub fn emit_llvm_ir(
+        &self,
+        functions: &[MirFunction],
+        output: &str,
+    ) -> Result<(), CodegenError> {
         Err(CodegenError::GenerationError("Not implemented".into()))
     }
 }
