@@ -57,6 +57,31 @@ impl ReuseAnalyzer {
             }
         }
     }
+
+    pub fn apply_reuse(&self, block: &BasicBlock) -> Vec<Instruction> {
+        let mut new_instructions = Vec::new();
+
+        for instr in &block.instructions {
+            if let Instruction::Alloc { target, ty } = instr {
+                if let Some(reuse_info) = self.reuse_opportunities.get(target) {
+                    if reuse_info.type_compatible {
+                        new_instructions.push(Instruction::Reuse {
+                            old: reuse_info.old_var.clone(),
+                            new: target.clone(),
+                        });
+                    } else {
+                        new_instructions.push(instr.clone());
+                    }
+                } else {
+                    new_instructions.push(instr.clone());
+                }
+            } else {
+                new_instructions.push(instr.clone());
+            }
+        }
+
+        new_instructions
+    }
 }
 
 impl Default for ReuseAnalyzer {
