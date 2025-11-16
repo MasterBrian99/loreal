@@ -60,198 +60,59 @@ impl LivenessAnalyzer {
                     }
 
                     self.compute_kill_points(node_idx, block, &live_out);
-                }
-            }
-        }
-
-        changed
-    }
-
-    fn compute_use_def(&self, block: &BasicBlock) -> (HashSet<SmolStr>, HashSet<SmolStr>) {
-        let mut use_set = HashSet::new();
-        let mut def_set = HashSet::new();
-
-        for instr in &block.instructions {
-            match instr {
-                Instruction::Assign { value, .. } => {
-                    self.collect_variables(value, &mut use_set, &mut def_set);
-                }
-                Instruction::BinaryOp {
-                    left,
-                    right,
-                    target,
-                    ..
-                } => {
-                    self.collect_variables(left, &mut use_set, &mut def_set);
-                    self.collect_variables(right, &mut use_set, &mut def_set);
-                    def_set.insert(target.clone());
-                }
-                Instruction::UnaryOp {
-                    operand, target, ..
-                } => {
-                    self.collect_variables(operand, &mut use_set, &mut def_set);
-                    def_set.insert(target.clone());
-                }
-                Instruction::Call { args, target, .. } => {
-                    for arg in args {
-                        self.collect_variables(arg, &mut use_set, &mut def_set);
-                    }
-                    if let Some(t) = target {
-                        def_set.insert(t.clone());
-                    }
-                }
-                Instruction::FieldLoad { object, target, .. } => {
-                    self.collect_variables(object, &mut use_set, &mut def_set);
-                    def_set.insert(target.clone());
-                }
-                Instruction::FieldStore {
-                    target,
-                    value,
-                    field: _,
-                } => {
-                    use_set.insert(target.clone());
-                    self.collect_variables(value, &mut use_set, &mut def_set);
-                }
-                Instruction::IndexLoad {
-                    object,
-                    index,
-                    target,
-                    ..
-                } => {
-                    self.collect_variables(object, &mut use_set, &mut def_set);
-                    self.collect_variables(index, &mut use_set, &mut def_set);
-                    def_set.insert(target.clone());
-                }
-                Instruction::IndexStore {
-                    target,
-                    index,
-                    value,
-                    ..
-                } => {
-                    use_set.insert(target.clone());
-                    self.collect_variables(index, &mut use_set, &mut def_set);
-                    self.collect_variables(value, &mut use_set, &mut def_set);
-                }
-                _ => {}
-            }
-        }
-
-        (use_set, def_set)
-    }
-
-    fn collect_variables(
-        &self,
-        val: &Value,
-        use_set: &mut HashSet<SmolStr>,
-        def_set: &mut HashSet<SmolStr>,
-    ) {
-        match val {
-            Value::Var(name) if !def_set.contains(name) => {
-                use_set.insert(name.clone());
-            }
-            _ => {}
         }
     }
 
-    fn compute_kill_points(
-        &mut self,
-        node: NodeIndex,
-        block: &BasicBlock,
-        live_out: &HashSet<SmolStr>,
-    ) {
-        let mut kill_points = HashMap::new();
-        let mut live = live_out.clone();
+    pub fn insert_drops(&mut self, cfg: &Graph<BasicBlock, crate::ControlFlow>) -> HashMap<NodeIndex, Vec<Instruction>> {
+        let mut modified_blocks = HashMap::new();
 
-        for (idx, instr) in block.instructions.iter().enumerate().rev() {
-            match instr {
-                Instruction::Assign { target, value } => {
-                    self.collect_variables(value, &mut live, &mut HashSet::new());
-                    if !live.contains(target) {
-                        kill_points.insert(target.clone(), idx);
-                    }
-                    def_insert(target, &mut live);
-                }
-                Instruction::BinaryOp {
-                    target,
-                    left,
-                    right,
-                    ..
-                } => {
-                    self.collect_variables(left, &mut live, &mut HashSet::new());
-                    self.collect_variables(right, &mut live, &mut HashSet::new());
-                    if !live.contains(target) {
-                        kill_points.insert(target.clone(), idx);
-                    }
-                    def_insert(target, &mut live);
-                }
-                Instruction::UnaryOp {
-                    target, operand, ..
-                } => {
-                    self.collect_variables(operand, &mut live, &mut HashSet::new());
-                    if !live.contains(target) {
-                        kill_points.insert(target.clone(), idx);
-                    }
-                    def_insert(target, &mut live);
-                }
-                Instruction::Call { target, args, .. } => {
-                    for arg in args {
-                        self.collect_variables(arg, &mut live, &mut HashSet::new());
-                    }
-                    if let Some(t) = target {
-                        if !live.contains(t) {
-                            kill_points.insert(t.clone(), idx);
+        for (node, kill_points) in &self.kill_points {
+            if let Some(block) = cfg.node_weight(*node) {
+                let mut new_instructions = block.instructions.clone();
+
+                for (idx, instr) in block.instructions.iter().enumerate() {
+                    if let Some(kill_idx) = kill_points.get(instr_to_var(instr)) {
+                        if *kill_idx == idx {
+                            new_instructions.insert(
+                                idx + 1,
+                                Instruction::Dec {
+                                    var: var_from_instr(instr),
+                                },
+                            );
                         }
-                        def_insert(t, &mut live);
                     }
                 }
-                Instruction::FieldLoad { target, object, .. } => {
-                    self.collect_variables(object, &mut live, &mut HashSet::new());
-                    if !live.contains(target) {
-                        kill_points.insert(target.clone(), idx);
-                    }
-                    def_insert(target, &mut live);
-                }
-                Instruction::FieldStore { target, value, .. } => {
-                    use_insert(target, &mut live);
-                    self.collect_variables(value, &mut live, &mut HashSet::new());
-                }
-                Instruction::IndexLoad {
-                    target,
-                    object,
-                    index,
-                    ..
-                } => {
-                    self.collect_variables(object, &mut live, &mut HashSet::new());
-                    self.collect_variables(index, &mut live, &mut HashSet::new());
-                    if !live.contains(target) {
-                        kill_points.insert(target.clone(), idx);
-                    }
-                    def_insert(target, &mut live);
-                }
-                Instruction::IndexStore {
-                    target,
-                    index,
-                    value,
-                    ..
-                } => {
-                    use_insert(target, &mut live);
-                    self.collect_variables(index, &mut live, &mut HashSet::new());
-                    self.collect_variables(value, &mut live, &mut HashSet::new());
-                }
-                _ => {}
+
+                modified_blocks.insert(*node, new_instructions);
             }
         }
 
-        self.kill_points.insert(node, kill_points);
+        modified_blocks
     }
 }
 
-fn use_insert(name: &SmolStr, set: &mut HashSet<SmolStr>) {
-    set.insert(name.clone());
+fn instr_to_var(instr: &Instruction) -> Option<SmolStr> {
+    match instr {
+        Instruction::Assign { target, .. } => Some(target.clone()),
+        Instruction::BinaryOp { target, .. } => Some(target.clone()),
+        Instruction::UnaryOp { target, .. } => Some(target.clone()),
+        Instruction::FieldLoad { target, .. } => Some(target.clone()),
+        Instruction::IndexLoad { target, .. } => Some(target.clone()),
+        Instruction::Call { target: Some(t), .. } => Some(t.clone()),
+        _ => None,
+    }
 }
 
-fn def_insert(name: &SmolStr, set: &mut HashSet<SmolStr>) {
-    set.insert(name.clone());
+fn var_from_instr(instr: &Instruction) -> SmolStr {
+    match instr {
+        Instruction::Assign { target, .. } => target.clone(),
+        Instruction::BinaryOp { target, .. } => target.clone(),
+        Instruction::UnaryOp { target, .. } => target.clone(),
+        Instruction::FieldLoad { target, .. } => target.clone(),
+        Instruction::IndexLoad { target, .. } => target.clone(),
+        Instruction::Call { target: Some(t), .. } => t.clone(),
+        _ => SmolStr::new(""),
+    }
 }
 
 impl Default for LivenessAnalyzer {
