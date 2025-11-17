@@ -1,4 +1,4 @@
-use crate::{BasicBlock, ControlFlow, Instruction, Value, Type};
+use crate::{BasicBlock, ControlFlow, Instruction, Type, Value};
 use petgraph::graph::{Graph, NodeIndex};
 use smol_str::SmolStr;
 use std::collections::HashMap;
@@ -49,9 +49,7 @@ impl RcInserter {
         if let Value::Var(name) = val {
             if let Some(ty) = self.types.get(name) {
                 if self.is_rc_type(ty) {
-                    instrs.push(Instruction::Inc {
-                        var: name.clone(),
-                    });
+                    instrs.push(Instruction::Inc { var: name.clone() });
                 }
             }
         }
@@ -61,9 +59,7 @@ impl RcInserter {
         if let Value::Var(name) = val {
             if let Some(ty) = self.types.get(name) {
                 if self.is_rc_type(ty) {
-                    instrs.push(Instruction::Dec {
-                        var: name.clone(),
-                    });
+                    instrs.push(Instruction::Dec { var: name.clone() });
                 }
             }
         }

@@ -171,6 +171,33 @@ fn main() -> Result<()> {
 
             Ok(())
         }
-        Commands::Run { input, args } => todo!(),
+        Commands::Run { input, args } => {
+            println!("🚀 Running: {}", input.display());
+
+            let output_exe = PathBuf::from("a.out");
+
+            let mut build_cmd = std::process::Command::new(std::env::current_exe().into_diagnostic()?);
+            build_cmd
+                .arg("build")
+                .arg(&input)
+                .arg("-o")
+                .arg(&output_exe);
+
+            let status = build_cmd.status().into_diagnostic()?;
+            if !status.success() {
+                return Err(miette::miette!("Build failed"));
+            }
+
+            let mut run_cmd = std::process::Command::new(format!("./{}", output_exe.display()));
+            run_cmd.args(args);
+
+            let status = run_cmd.status().into_diagnostic()?;
+
+            if let Some(code) = status.code() {
+                println!("\n[Program exited with code {}]", code);
+            }
+
+            Ok(())
+        }
     }
 }
