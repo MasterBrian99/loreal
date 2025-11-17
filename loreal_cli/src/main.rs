@@ -176,7 +176,8 @@ fn main() -> Result<()> {
 
             let output_exe = PathBuf::from("a.out");
 
-            let mut build_cmd = std::process::Command::new(std::env::current_exe().into_diagnostic()?);
+            let mut build_cmd =
+                std::process::Command::new(std::env::current_exe().into_diagnostic()?);
             build_cmd
                 .arg("build")
                 .arg(&input)

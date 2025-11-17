@@ -1,5 +1,3 @@
-
-
 [workspace]
 resolver = "2"
 members = [
@@ -13,9 +11,6 @@ members = [
     "loreal_runtime",
 ]
 
-
-
-
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
@@ -28,15 +23,8 @@ clap = { version = "4.5.47", features = ["derive"] }
 miette = { version = "7.0", features = ["fancy"] }
 thiserror = "2.0"
 
-# String handling
 smol_str = "0.3"
-
-# Type inference and graph algorithms
 ena = "0.14"
 petgraph = "0.6"
-
-# Bit manipulation for liveness analysis
 bit-set = "0.8"
-
-# Runtime dependencies
 mimalloc = "0.1"
