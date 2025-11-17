@@ -7,11 +7,13 @@ pub mod anf;
 pub mod liveness;
 pub mod borrow;
 pub mod reuse;
+pub mod rc;
 
 pub use anf::ANFTransformer;
 pub use liveness::LivenessAnalyzer;
 pub use borrow::BorrowInferencer;
 pub use reuse::ReuseAnalyzer;
+pub use rc::RcInserter;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
