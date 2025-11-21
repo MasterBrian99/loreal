@@ -28,3 +28,12 @@ ena = "0.14"
 petgraph = "0.6"
 bit-set = "0.8"
 mimalloc = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
