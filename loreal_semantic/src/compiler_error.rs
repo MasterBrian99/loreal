@@ -19,8 +19,5 @@ pub enum CompilerError {
     Codegen(String),
 
     #[error("IO error at {location:?}: {source}")]
-    Io {
-        source: String,
-        location: Span,
-    },
+    Io { source: String, location: Span },
 }
