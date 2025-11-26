@@ -3,6 +3,12 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use miette::{IntoDiagnostic, Result};
 
+enum ColorOutput {
+    Auto,
+    Always,
+    Never,
+}
+
 #[derive(Parser)]
 #[command(name = "loreal")]
 #[command(about = "A purely functional language with compile-time reference counting", long_about = None)]
