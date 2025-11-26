@@ -15,6 +15,26 @@ pub use borrow::BorrowInferencer;
 pub use reuse::ReuseAnalyzer;
 pub use rc::RcInserter;
 
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Var(name) => write!(f, "{}", name),
+            Value::IntConst(val) => write!(f, "{}", val),
+            Value::FloatConst(val) => write!(f, "{}", val),
+            Value::BoolConst(val) => write!(f, "{}", val),
+            Value::StringLiteral(val) => write!(f, "{:?}", val),
+            Value::CharLiteral(val) => write!(f, "{:?}", val),
+            Value::NilConst => write!(f, "nil"),
+        }
+    }
+}
+
+impl std::fmt::Debug for MirFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MirFunction(name={}, params={:?})", self.name, self.params)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Var(SmolStr),
