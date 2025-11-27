@@ -15,6 +15,17 @@ enum ColorOutput {
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    #[arg(short, long, default_value = "warn")]
+    verbose: u8,
+}
+
+#[derive(Parser)]
+#[command(name = "loreal")]
+#[command(about = "A purely functional language with compile-time reference counting", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 }
 
 #[derive(Subcommand)]
