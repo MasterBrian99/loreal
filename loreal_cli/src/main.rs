@@ -58,10 +58,10 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
-    // Parse command-line arguments
+    let start_time = std::time::Instant::now();
+
     let cli = Cli::parse();
-    match cli.command {
-        Commands::Build { input, output } => {
+    match cli.command {        Commands::Build { input, output } => {
             println!("📦 Building: {}", input.display());
 
             // Phase 1: Read source file
