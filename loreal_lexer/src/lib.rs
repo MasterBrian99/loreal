@@ -6,6 +6,9 @@ use thiserror::Error;
 
 use crate::{token::{Token, TokenKind}};
 
+mod utils;
+pub use utils::{is_keyword, escape_string};
+
 mod token;
 
 #[derive(Error, Debug, Clone)]

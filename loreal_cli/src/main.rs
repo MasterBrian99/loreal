@@ -61,7 +61,8 @@ fn main() -> Result<()> {
     let start_time = std::time::Instant::now();
 
     let cli = Cli::parse();
-    match cli.command {        Commands::Build { input, output } => {
+    match cli.command {
+        Commands::Build { input, output } => {
             println!("📦 Building: {}", input.display());
 
             // Phase 1: Read source file
@@ -217,5 +218,10 @@ fn main() -> Result<()> {
 
             Ok(())
         }
+    }
+
+    let elapsed = start_time.elapsed();
+    if cli.verbose >= 1 {
+        println!("\n⏱️  Total time: {:?}", elapsed);
     }
 }
