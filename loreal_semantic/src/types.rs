@@ -106,6 +106,17 @@ impl ConcreteType {
         }
     }
 
+    pub fn is_numeric(&self) -> bool {
+        matches!(self, ConcreteType::Int | ConcreteType::Float)
+    }
+
+    pub fn is_primitive(&self) -> bool {
+        matches!(
+            self,
+            ConcreteType::Int | ConcreteType::Float | ConcreteType::Bool | ConcreteType::Char | ConcreteType::String | ConcreteType::Nil
+        )
+    }
+
     pub fn to_ast_type(&self) -> Type {
         match self {
             ConcreteType::Int => Type::Named {

@@ -3,10 +3,30 @@ use smol_str::SmolStr;
 pub fn is_keyword(ident: &str) -> bool {
     matches!(
         ident,
-        "module" | "def" | "do" | "end" | "let" | "if" | "else" |
-        "match" | "import" | "export" | "protocol" | "impl" |
-        "struct" | "true" | "false" | "nil" | "fn" | "loop" |
-        "next" | "break" | "then" | "case" | "and" | "or"
+        "module"
+            | "def"
+            | "do"
+            | "end"
+            | "let"
+            | "if"
+            | "else"
+            | "match"
+            | "import"
+            | "export"
+            | "protocol"
+            | "impl"
+            | "struct"
+            | "true"
+            | "false"
+            | "nil"
+            | "fn"
+            | "loop"
+            | "next"
+            | "break"
+            | "then"
+            | "case"
+            | "and"
+            | "or"
     )
 }
 

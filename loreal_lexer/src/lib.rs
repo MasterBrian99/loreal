@@ -1,13 +1,13 @@
-use std::iter::Peekable;
-use std::str::CharIndices;
 use loreal_ast::span::Span;
 use smol_str::SmolStr;
+use std::iter::Peekable;
+use std::str::CharIndices;
 use thiserror::Error;
 
-use crate::{token::{Token, TokenKind}};
+use crate::token::{Token, TokenKind};
 
 mod utils;
-pub use utils::{is_keyword, escape_string};
+pub use utils::{escape_string, is_keyword};
 
 mod token;
 
