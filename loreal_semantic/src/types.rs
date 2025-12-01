@@ -113,7 +113,12 @@ impl ConcreteType {
     pub fn is_primitive(&self) -> bool {
         matches!(
             self,
-            ConcreteType::Int | ConcreteType::Float | ConcreteType::Bool | ConcreteType::Char | ConcreteType::String | ConcreteType::Nil
+            ConcreteType::Int
+                | ConcreteType::Float
+                | ConcreteType::Bool
+                | ConcreteType::Char
+                | ConcreteType::String
+                | ConcreteType::Nil
         )
     }
 

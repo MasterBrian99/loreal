@@ -8,12 +8,14 @@ pub mod liveness;
 pub mod borrow;
 pub mod reuse;
 pub mod rc;
+pub mod graph;
 
 pub use anf::ANFTransformer;
 pub use liveness::LivenessAnalyzer;
 pub use borrow::BorrowInferencer;
 pub use reuse::ReuseAnalyzer;
 pub use rc::RcInserter;
+pub use graph::{get_predecessors, get_successors, is_dominator};
 
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
