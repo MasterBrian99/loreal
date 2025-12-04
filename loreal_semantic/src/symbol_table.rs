@@ -54,6 +54,20 @@ impl SymbolTable {
     }
 }
 
+impl SymbolTable {
+    pub fn lookup_function(&self, name: &SmolStr) -> Option<&SymbolInfo> {
+        self.lookup(name)
+    }
+
+    pub fn lookup_variable(&self, name: &SmolStr) -> Option<&SymbolInfo> {
+        self.lookup(name)
+    }
+
+    pub fn contains(&self, name: &SmolStr) -> bool {
+        self.lookup(name).is_some()
+    }
+}
+
 impl Default for SymbolTable {
     fn default() -> Self {
         Self::new()
