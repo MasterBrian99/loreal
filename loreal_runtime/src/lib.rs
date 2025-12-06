@@ -1,6 +1,8 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::os::raw::c_void;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::ffi::c_char;
+use std::slice;
 
 #[repr(C)]
 pub struct LorealValue {
@@ -11,6 +13,34 @@ pub struct LorealValue {
 #[repr(C)]
 pub struct RcHeader {
     pub ref_count: AtomicUsize,
+}
+
+#[no_mangle]
+pub extern "C" fn loreal_string_alloc(len: usize) -> *mut c_void {
+    unsafe {
+        let header_size = std::mem::size_of::<RcHeader>();
+        let total_size = header_size + len;
+        let layout = Layout::from_size_align_unchecked(total_size, 8);
+        let ptr = System.alloc(layout) as *mut u8;
+
+        let header = ptr as *mut RcHeader;
+        (*header).ref_count.store(1, Ordering::SeqCst);
+
+        let string_ptr = ptr.add(header_size);
+        slice::from_raw_parts_mut(string_ptr as *mut c_char, len).fill(0);
+
+        string_ptr as *mut c_void
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn loreal_string_copy(dest: *mut c_char, src: *const c_char, len: usize) {
+    unsafe {
+        if !dest.is_null() && !src.is_null() {
+            slice::from_raw_parts_mut(dest, len)
+                .copy_from_slice(slice::from_raw_parts(src as *const c_char, len));
+        }
+    }
 }
 
 #[no_mangle]
