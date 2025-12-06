@@ -1,4 +1,8 @@
 pub mod span;
+pub mod visitor;
+
+pub use span::Span;
+pub use visitor::ExprVisitor;
 
 pub use span::Span;
 
