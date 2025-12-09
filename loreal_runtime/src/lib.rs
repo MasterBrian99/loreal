@@ -1,8 +1,8 @@
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::os::raw::c_void;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::ffi::c_char;
+use std::os::raw::c_void;
 use std::slice;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[repr(C)]
 pub struct LorealValue {
@@ -39,6 +39,41 @@ pub extern "C" fn loreal_string_copy(dest: *mut c_char, src: *const c_char, len:
         if !dest.is_null() && !src.is_null() {
             slice::from_raw_parts_mut(dest, len)
                 .copy_from_slice(slice::from_raw_parts(src as *const c_char, len));
+        }
+    }
+}
+
+#[repr(C)]
+pub struct LorealList {
+    pub ptr: *mut LorealValue,
+    pub len: usize,
+}
+
+#[no_mangle]
+pub extern "C" fn loreal_list_alloc(len: usize, elem_size: usize) -> LorealList {
+    unsafe {
+        let header_size = std::mem::size_of::<RcHeader>();
+        let total_size = header_size + len * elem_size;
+        let layout = Layout::from_size_align_unchecked(total_size, 8);
+        let ptr = System.alloc(layout) as *mut u8;
+
+        let header = ptr as *mut RcHeader;
+        (*header).ref_count.store(1, Ordering::SeqCst);
+
+        LorealList {
+            ptr: ptr.add(header_size) as *mut LorealValue,
+            len,
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn loreal_list_get(list: LorealList, index: usize) -> *mut LorealValue {
+    unsafe {
+        if index < list.len {
+            list.ptr.add(index)
+        } else {
+            std::ptr::null_mut()
         }
     }
 }
