@@ -1,0 +1,6 @@
+def sum_list(xs: List[Int]) -> Int do
+    if xs == [] then
+        0
+    else
+        xs[0] + sum_list(xs[1:])
+end
