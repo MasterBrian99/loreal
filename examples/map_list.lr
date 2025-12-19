@@ -1,0 +1,9 @@
+def map_list(xs: List[Int], f: Int -> Int) -> List[Int] do
+    if xs == [] then
+        []
+    else
+        let first = xs[0]
+        let rest = xs[1:]
+        let transformed = f(first)
+        [transformed] + map_list(rest, f)
+end
