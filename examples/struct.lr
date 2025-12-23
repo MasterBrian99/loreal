@@ -1,0 +1,9 @@
+struct Point:
+    x: Float
+    y: Float
+
+def distance(p1: Point, p2: Point) -> Float do
+    let dx = p1.x - p2.x
+    let dy = p1.y - p2.y
+    (dx * dx) + (dy * dy)
+end
