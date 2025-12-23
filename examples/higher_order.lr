@@ -1,0 +1,15 @@
+def apply_function(numbers: List[Int], f: Int -> Int) -> List[Int] do
+    if numbers == [] then
+        []
+    else
+        [f(numbers[0])] + apply_function(numbers[1:], f)
+end
+
+def double(n: Int) -> Int do
+    n * 2
+end
+
+def main() -> List[Int] do
+    let numbers = [1, 2, 3, 4, 5]
+    apply_function(numbers, double)
+end
