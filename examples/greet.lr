@@ -1,0 +1,12 @@
+struct Person:
+    name: String
+    age: Int
+
+def greet(person: Person) -> String do
+    "Hello, " ++ person.name ++ "!"
+end
+
+def main() -> String do
+    let p = Person { name: "World", age: 30 }
+    greet(p)
+end
