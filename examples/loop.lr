@@ -1,0 +1,8 @@
+def loop_sum(n: Int) -> Int do
+    loop (0) (i, sum) -> do
+        if i > n then
+            sum
+        else
+            next (i + 1, sum + i)
+end
+end
