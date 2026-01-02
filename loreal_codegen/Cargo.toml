@@ -14,6 +14,7 @@ mlir-backend = []
 loreal_ast = { path = "../loreal_ast" }
 loreal_mir = { path = "../loreal_mir" }
 smol_str.workspace = true
+thiserror.workspace = true
 
 inkwell = { version = "0.7.1", features = ["llvm21-1", "target-all"], optional = true }
 either = "1.9"

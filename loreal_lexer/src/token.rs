@@ -39,7 +39,6 @@ pub enum TokenKind {
     Break,
     Then,
     Case,
-    Match,
 
     // Identifiers and Literals
     Identifier(SmolStr),

@@ -4,12 +4,11 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 use thiserror::Error;
 
-use crate::token::{Token, TokenKind};
-
 mod utils;
 pub use utils::{escape_string, is_keyword};
 
-mod token;
+pub mod token;
+pub use token::{Token, TokenKind};
 
 #[derive(Error, Debug, Clone)]
 pub enum LexError {

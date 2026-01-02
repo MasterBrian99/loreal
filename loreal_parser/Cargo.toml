@@ -7,3 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+loreal_ast = { path = "../loreal_ast" }
+loreal_lexer = { path = "../loreal_lexer" }
+thiserror = { workspace = true }
+smol_str = { workspace = true }

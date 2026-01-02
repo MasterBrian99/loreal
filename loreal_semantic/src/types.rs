@@ -20,7 +20,7 @@ pub enum ConcreteType {
 }
 
 impl ConcreteType {
-    fn from_ast_type(ty: &Type) -> Self {
+    pub fn from_ast_type(ty: &Type) -> Self {
         match ty {
             Type::Named { name, .. } => match name.as_str() {
                 "Int" => ConcreteType::Int,
@@ -49,7 +49,7 @@ impl ConcreteType {
         }
     }
 
-    fn is_compatible(&self, other: &ConcreteType) -> bool {
+    pub fn is_compatible(&self, other: &ConcreteType) -> bool {
         match (self, other) {
             (ConcreteType::Unknown, _) | (_, ConcreteType::Unknown) => true,
             (ConcreteType::Int, ConcreteType::Int) => true,
@@ -81,7 +81,7 @@ impl ConcreteType {
         }
     }
 
-    fn to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         match self {
             ConcreteType::Int => "Int".to_string(),
             ConcreteType::Float => "Float".to_string(),

@@ -1,4 +1,4 @@
-use loreal_ast::*;
+use crate::*;
 
 pub trait ExprVisitor {
     fn visit_expr(&mut self, expr: &Expr) {

@@ -14,6 +14,7 @@ impl ANFTransformer {
     pub fn clear_bindings(&mut self) {
         self.bindings.clear();
     }
+}
 
 impl ANFTransformer {
     pub fn new() -> Self {
@@ -68,7 +69,7 @@ impl ANFTransformer {
                             span,
                         },
                         type_annotation: None,
-                        value: Box::new(left_atomic),
+                        value: left_atomic,
                         span,
                     });
                     Expr::Identifier { name: t, span }
@@ -84,7 +85,7 @@ impl ANFTransformer {
                             span,
                         },
                         type_annotation: None,
-                        value: Box::new(right_atomic),
+                        value: right_atomic,
                         span,
                     });
                     Expr::Identifier { name: t, span }
@@ -103,7 +104,7 @@ impl ANFTransformer {
                         span,
                     },
                     type_annotation: None,
-                    value: Box::new(result_expr),
+                    value: result_expr,
                     span,
                 });
 
@@ -124,7 +125,7 @@ impl ANFTransformer {
                             span,
                         },
                         type_annotation: None,
-                        value: Box::new(atomic_operand),
+                        value: atomic_operand,
                         span,
                     });
                     Expr::Identifier { name: t, span }
@@ -142,7 +143,7 @@ impl ANFTransformer {
                         span,
                     },
                     type_annotation: None,
-                    value: Box::new(result_expr),
+                    value: result_expr,
                     span,
                 });
 
@@ -164,7 +165,7 @@ impl ANFTransformer {
                                 span,
                             },
                             type_annotation: None,
-                            value: Box::new(atomic_arg),
+                            value: atomic_arg,
                             span,
                         });
                         atomic_args.push(Expr::Identifier { name: t, span });
@@ -184,7 +185,7 @@ impl ANFTransformer {
                         span,
                     },
                     type_annotation: None,
-                    value: Box::new(result_expr),
+                    value: result_expr,
                     span,
                 });
 
@@ -205,18 +206,18 @@ impl ANFTransformer {
                             value,
                             span: stmt_span,
                         } => {
-                            let transformed_value = self.transform(*value);
+                            let transformed_value = self.transform(value);
                             transformed_statements.push(Statement::Let {
                                 pattern,
                                 type_annotation,
-                                value: Box::new(transformed_value),
+                                value: transformed_value,
                                 span: stmt_span,
                             });
                         }
                         Statement::Expr { expr, span: stmt_span } => {
-                            let transformed_expr = self.transform(*expr);
+                            let transformed_expr = self.transform(expr);
                             transformed_statements.push(Statement::Expr {
-                                expr: Box::new(transformed_expr),
+                                expr: transformed_expr,
                                 span: stmt_span,
                             });
                         }
@@ -249,7 +250,7 @@ impl ANFTransformer {
                             span,
                         },
                         type_annotation: None,
-                        value: Box::new(atomic_cond),
+                        value: atomic_cond,
                         span,
                     });
                     Expr::Identifier { name: t, span }
@@ -280,7 +281,7 @@ impl ANFTransformer {
                                 span,
                             },
                             type_annotation: None,
-                            value: Box::new(atomic_field),
+                            value: atomic_field,
                             span,
                         });
                         atomic_fields.push((field_name.clone(), Expr::Identifier { name: t, span }));
@@ -300,7 +301,7 @@ impl ANFTransformer {
                         span,
                     },
                     type_annotation: None,
-                    value: Box::new(result_expr),
+                    value: result_expr,
                     span,
                 });
 
@@ -321,7 +322,7 @@ impl ANFTransformer {
                                 span,
                             },
                             type_annotation: None,
-                            value: Box::new(atomic_elem),
+                            value: atomic_elem,
                             span,
                         });
                         atomic_elements.push(Expr::Identifier { name: t, span });
@@ -340,7 +341,7 @@ impl ANFTransformer {
                         span,
                     },
                     type_annotation: None,
-                    value: Box::new(result_expr),
+                    value: result_expr,
                     span,
                 });
 
@@ -361,7 +362,7 @@ impl ANFTransformer {
                                 span,
                             },
                             type_annotation: None,
-                            value: Box::new(atomic_elem),
+                            value: atomic_elem,
                             span,
                         });
                         atomic_elements.push(Expr::Identifier { name: t, span });
@@ -380,7 +381,7 @@ impl ANFTransformer {
                         span,
                     },
                     type_annotation: None,
-                    value: Box::new(result_expr),
+                    value: result_expr,
                     span,
                 });
 
@@ -406,7 +407,7 @@ impl ANFTransformer {
                                 span,
                             },
                             type_annotation: None,
-                            value: Box::new(atomic_init),
+                            value: atomic_init,
                             span,
                         });
                         atomic_inits.push(Expr::Identifier { name: t, span });

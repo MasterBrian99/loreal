@@ -60,7 +60,11 @@ impl LivenessAnalyzer {
                     }
 
                     self.compute_kill_points(node_idx, block, &live_out);
+                }
+            }
         }
+
+        changed
     }
 
     pub fn insert_drops(&mut self, cfg: &Graph<BasicBlock, crate::ControlFlow>) -> HashMap<NodeIndex, Vec<Instruction>> {
@@ -71,14 +75,16 @@ impl LivenessAnalyzer {
                 let mut new_instructions = block.instructions.clone();
 
                 for (idx, instr) in block.instructions.iter().enumerate() {
-                    if let Some(kill_idx) = kill_points.get(instr_to_var(instr)) {
-                        if *kill_idx == idx {
-                            new_instructions.insert(
-                                idx + 1,
-                                Instruction::Dec {
-                                    var: var_from_instr(instr),
-                                },
-                            );
+                    if let Some(var) = instr_to_var(instr) {
+                        if let Some(kill_idx) = kill_points.get(&var) {
+                            if *kill_idx == idx {
+                                new_instructions.insert(
+                                    idx + 1,
+                                    Instruction::Dec {
+                                        var: var_from_instr(instr),
+                                    },
+                                );
+                            }
                         }
                     }
                 }
@@ -88,6 +94,74 @@ impl LivenessAnalyzer {
         }
 
         modified_blocks
+    }
+
+    fn compute_use_def(&self, block: &BasicBlock) -> (HashSet<SmolStr>, HashSet<SmolStr>) {
+        let mut use_set = HashSet::new();
+        let mut def_set = HashSet::new();
+
+        for instr in &block.instructions {
+            match instr {
+                Instruction::Assign { target, value } => {
+                    def_set.insert(target.clone());
+                    self.collect_vars_from_value(value, &mut use_set);
+                }
+                Instruction::BinaryOp { target, left, right, .. } => {
+                    def_set.insert(target.clone());
+                    self.collect_vars_from_value(left, &mut use_set);
+                    self.collect_vars_from_value(right, &mut use_set);
+                }
+                Instruction::UnaryOp { target, operand, .. } => {
+                    def_set.insert(target.clone());
+                    self.collect_vars_from_value(operand, &mut use_set);
+                }
+                Instruction::FieldLoad { target, object, .. } => {
+                    def_set.insert(target.clone());
+                    self.collect_vars_from_value(object, &mut use_set);
+                }
+                Instruction::IndexLoad { target, object, index, .. } => {
+                    def_set.insert(target.clone());
+                    self.collect_vars_from_value(object, &mut use_set);
+                    self.collect_vars_from_value(index, &mut use_set);
+                }
+                Instruction::Call { target, func, args } => {
+                    if let Some(t) = target {
+                        def_set.insert(t.clone());
+                    }
+                    self.collect_vars_from_value(&Value::Var(func.clone()), &mut use_set);
+                    for arg in args {
+                        self.collect_vars_from_value(arg, &mut use_set);
+                    }
+                }
+                Instruction::Alloc { .. } | Instruction::FieldStore { .. } | Instruction::IndexStore { .. } | Instruction::AllocList { .. } => {}
+                Instruction::Dec { .. } | Instruction::Inc { .. } | Instruction::Drop { .. } | Instruction::Dup { .. } | Instruction::Reuse { .. } => {}
+            }
+        }
+
+        (use_set, def_set)
+    }
+
+    fn compute_kill_points(&mut self, node_idx: NodeIndex, block: &BasicBlock, live_out: &HashSet<SmolStr>) {
+        let mut kill_map = HashMap::new();
+
+        for (idx, instr) in block.instructions.iter().enumerate() {
+            if let Some(var) = instr_to_var(instr) {
+                if live_out.contains(&var) {
+                    kill_map.insert(var, idx);
+                }
+            }
+        }
+
+        self.kill_points.insert(node_idx, kill_map);
+    }
+
+    fn collect_vars_from_value(&self, value: &Value, use_set: &mut HashSet<SmolStr>) {
+        match value {
+            Value::Var(name) => {
+                use_set.insert(name.clone());
+            }
+            _ => {}
+        }
     }
 }
 

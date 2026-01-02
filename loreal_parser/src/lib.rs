@@ -1,5 +1,6 @@
 use loreal_ast::*;
 use loreal_lexer::{LexError, Token, TokenKind};
+use smol_str::SmolStr;
 use std::iter::Peekable;
 use thiserror::Error;
 
@@ -95,6 +96,9 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
         }
 
         Ok(Module {
+            name: "main".into(),
+            exports: Vec::new(),
+            imports: Vec::new(),
             declarations,
             span: Span::new(0, 0),
         })
@@ -278,7 +282,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
                 Some(TokenKind::Slash) => BinOp::Div,
                 Some(TokenKind::Percent) => BinOp::Mod,
                 Some(TokenKind::EqEq) => BinOp::Eq,
-                Some(TokenKind::Neq) => BinOp::Ne,
+                Some(TokenKind::Ne) => BinOp::Ne,
                 Some(TokenKind::Lt) => BinOp::Lt,
                 Some(TokenKind::Le) => BinOp::Le,
                 Some(TokenKind::Gt) => BinOp::Gt,
@@ -289,7 +293,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
                 _ => break,
             };
 
-            self.advance().ok()?;
+            self.advance();
             let right = self.parse_binary_op(op_prec + 1)?;
             left = Expr::BinaryOp {
                 op,
@@ -306,7 +310,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
         match self.peek() {
             Some(TokenKind::Or) => 1,
             Some(TokenKind::And) => 2,
-            Some(TokenKind::EqEq) | Some(TokenKind::Neq) => 3,
+            Some(TokenKind::EqEq) | Some(TokenKind::Ne) => 3,
             Some(TokenKind::Lt) | Some(TokenKind::Le) | Some(TokenKind::Gt)
             | Some(TokenKind::Ge) => 4,
             Some(TokenKind::Plus) | Some(TokenKind::Minus) => 5,
@@ -318,7 +322,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
 
     fn parse_unary_op(&mut self) -> Option<Expr> {
         if self.check(&TokenKind::Minus) {
-            self.advance().ok()?;
+            self.advance();
             let operand = self.parse_unary_op()?;
             Some(Expr::UnaryOp {
                 op: UnOp::Neg,
@@ -326,7 +330,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
                 span: Span::new(0, 0),
             })
         } else if self.check(&TokenKind::Not) {
-            self.advance().ok()?;
+            self.advance();
             let operand = self.parse_unary_op()?;
             Some(Expr::UnaryOp {
                 op: UnOp::Not,
@@ -342,7 +346,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
         match self.peek() {
             Some(TokenKind::IntLiteral(value)) => {
                 let value = *value;
-                self.advance().ok()?;
+                self.advance();
                 Some(Expr::IntLiteral {
                     value,
                     span: Span::new(0, 0),
@@ -350,15 +354,23 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             }
             Some(TokenKind::FloatLiteral(value)) => {
                 let value = *value;
-                self.advance().ok()?;
+                self.advance();
                 Some(Expr::FloatLiteral {
                     value,
                     span: Span::new(0, 0),
                 })
             }
-            Some(TokenKind::BoolLiteral(value)) => {
-                let value = *value;
-                self.advance().ok()?;
+            Some(TokenKind::True) => {
+                let value = true;
+                self.advance();
+                Some(Expr::BoolLiteral {
+                    value,
+                    span: Span::new(0, 0),
+                })
+            }
+            Some(TokenKind::False) => {
+                let value = false;
+                self.advance();
                 Some(Expr::BoolLiteral {
                     value,
                     span: Span::new(0, 0),
@@ -366,7 +378,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             }
             Some(TokenKind::CharLiteral(value)) => {
                 let value = *value;
-                self.advance().ok()?;
+                self.advance();
                 Some(Expr::CharLiteral {
                     value,
                     span: Span::new(0, 0),
@@ -374,7 +386,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             }
             Some(TokenKind::StringLiteral(value)) => {
                 let value = value.clone();
-                self.advance().ok()?;
+                self.advance();
                 Some(Expr::StringLiteral {
                     value,
                     span: Span::new(0, 0),
@@ -478,7 +490,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             init_values.push(init);
 
             if self.check(&TokenKind::Comma) {
-                self.advance().ok()?;
+                self.advance();
             }
         }
 
@@ -487,7 +499,7 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             let var = self.expect_identifier()?;
             loop_vars.push(var);
             if self.check(&TokenKind::Comma) {
-                self.advance().ok()?;
+                self.advance();
             }
         }
 
@@ -513,18 +525,18 @@ impl<I: Iterator<Item = Result<Token, LexError>>> Parser<I> {
             } else {
                 None
             };
-            self.expect(TokenKind::Assign).ok()?;
+            self.expect(TokenKind::Eq).ok()?;
             let value = self.parse_expr()?;
             Some(Statement::Let {
                 pattern,
                 type_annotation,
-                value: Box::new(value),
+                value,
                 span: Span::new(0, 0),
             })
         } else {
             let expr = self.parse_expr()?;
             Some(Statement::Expr {
-                expr: Box::new(expr),
+                expr,
                 span: Span::new(0, 0),
             })
         }

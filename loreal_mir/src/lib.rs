@@ -24,8 +24,8 @@ impl std::fmt::Display for Value {
             Value::IntConst(val) => write!(f, "{}", val),
             Value::FloatConst(val) => write!(f, "{}", val),
             Value::BoolConst(val) => write!(f, "{}", val),
-            Value::StringLiteral(val) => write!(f, "{:?}", val),
-            Value::CharLiteral(val) => write!(f, "{:?}", val),
+            Value::StringConst(val) => write!(f, "{:?}", val),
+            Value::CharConst(val) => write!(f, "{:?}", val),
             Value::NilConst => write!(f, "nil"),
         }
     }
@@ -154,7 +154,6 @@ pub enum ControlFlow {
     Else,
 }
 
-#[derive(Debug, Clone)]
 pub struct MirFunction {
     pub name: SmolStr,
     pub params: Vec<(SmolStr, Type)>,
@@ -454,7 +453,7 @@ impl MirBuilder {
                 for (field_name, val) in fields.iter().zip(field_values.iter()) {
                     self.emit(Instruction::FieldStore {
                         target: temp.clone(),
-                        field: field_name.clone(),
+                        field: field_name.0.clone(),
                         value: val.clone(),
                     });
                 }
@@ -522,7 +521,7 @@ impl MirBuilder {
                     },
                 });
 
-                let (value, ty) = self.lower_expr(elements[0].clone());
+                let (value, ty) = self.lower_expr(&elements[0]);
                 self.emit(Instruction::IndexStore {
                     target: temp.clone(),
                     index: Value::IntConst(0),
@@ -586,14 +585,14 @@ impl MirBuilder {
             }
 
             ast::Expr::FunctionCall { func, args, span } => {
-                let atomic_func = self.lower_expr(*func);
+                let atomic_func = self.lower_expr(func);
                 let mut arg_values = Vec::new();
                 for arg in args {
                     let (val, _) = self.lower_expr(arg);
                     arg_values.push(val);
                 }
 
-                let func_name = if let Expr::Identifier { name, .. } = atomic_func.0 {
+                let func_name = if let Value::Var(name) = &atomic_func.0 {
                     name.clone()
                 } else {
                     "unknown".into()
@@ -719,20 +718,6 @@ impl MirBuilder {
             ast::Statement::Expr { expr, .. } => {
                 self.lower_expr(expr);
             }
-        }
-    }
-}
-
-                self.lower_expr(result)
-            }
-
-            _ => (
-                Value::NilConst,
-                Type::Named {
-                    name: "Unknown".into(),
-                    span: Span::new(0, 0),
-                },
-            ),
         }
     }
 }

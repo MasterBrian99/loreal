@@ -1,6 +1,8 @@
 use loreal_ast::StructDef;
 use loreal_mir::MirFunction;
 use smol_str::SmolStr;
+use thiserror::Error;
+use std::fmt;
 
 pub struct CodeGenerator {
     pub module_name: SmolStr,
@@ -9,8 +11,15 @@ pub struct CodeGenerator {
 
 #[derive(Debug)]
 pub enum CodegenError {
-    #[error("Failed to generate code for function: {0}")]
     GenerationError(String),
+}
+
+impl fmt::Display for CodegenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CodegenError::GenerationError(msg) => write!(f, "Failed to generate code: {}", msg),
+        }
+    }
 }
 
 impl std::error::Error for CodegenError {}

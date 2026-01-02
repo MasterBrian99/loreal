@@ -9,4 +9,9 @@ repository.workspace = true
 [dependencies]
 clap.workspace = true
 miette.workspace = true
+smol_str.workspace = true
+loreal_ast = { path = "../loreal_ast" }
 loreal_lexer = { path = "../loreal_lexer" }
+loreal_mir = { path = "../loreal_mir" }
+loreal_parser= {path = "../loreal_parser" }
+loreal_semantic = { path = "../loreal_semantic" }

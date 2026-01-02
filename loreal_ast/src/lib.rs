@@ -4,8 +4,6 @@ pub mod visitor;
 pub use span::Span;
 pub use visitor::ExprVisitor;
 
-pub use span::Span;
-
 use smol_str::SmolStr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -164,9 +162,34 @@ impl Expr {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    Pipe,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOp {
     Neg,
     Not,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Import {
+    pub path: Vec<SmolStr>,
+    pub alias: Option<SmolStr>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq)]

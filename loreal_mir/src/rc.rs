@@ -1,4 +1,4 @@
-use crate::{BasicBlock, ControlFlow, Instruction, Type, Value};
+use crate::{BasicBlock, ControlFlow, Instruction, MirFunction, Type, Value};
 use petgraph::graph::{Graph, NodeIndex};
 use smol_str::SmolStr;
 use std::collections::HashMap;

@@ -15,7 +15,7 @@ pub struct RcHeader {
     pub ref_count: AtomicUsize,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_string_alloc(len: usize) -> *mut c_void {
     unsafe {
         let header_size = std::mem::size_of::<RcHeader>();
@@ -33,7 +33,7 @@ pub extern "C" fn loreal_string_alloc(len: usize) -> *mut c_void {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_string_copy(dest: *mut c_char, src: *const c_char, len: usize) {
     unsafe {
         if !dest.is_null() && !src.is_null() {
@@ -49,7 +49,7 @@ pub struct LorealList {
     pub len: usize,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_list_alloc(len: usize, elem_size: usize) -> LorealList {
     unsafe {
         let header_size = std::mem::size_of::<RcHeader>();
@@ -67,7 +67,7 @@ pub extern "C" fn loreal_list_alloc(len: usize, elem_size: usize) -> LorealList 
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_list_get(list: LorealList, index: usize) -> *mut LorealValue {
     unsafe {
         if index < list.len {
@@ -78,7 +78,7 @@ pub extern "C" fn loreal_list_get(list: LorealList, index: usize) -> *mut Loreal
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_eq(a: *mut LorealValue, b: *mut LorealValue) -> bool {
     unsafe {
         if a.is_null() || b.is_null() {
@@ -94,13 +94,13 @@ pub extern "C" fn loreal_eq(a: *mut LorealValue, b: *mut LorealValue) -> bool {
 
         match a_val.tag {
             0 => {
-                let a_int = a.data as *const i64;
-                let b_int = b.data as *const i64;
+                let a_int = (*a).data as *const i64;
+                let b_int = (*b).data as *const i64;
                 *a_int == *b_int
             }
             2 => {
-                let a_bool = a.data as *const bool;
-                let b_bool = b.data as *const bool;
+                let a_bool = (*a).data as *const bool;
+                let b_bool = (*b).data as *const bool;
                 *a_bool == *b_bool
             }
             _ => a_val.data == b_val.data,
@@ -108,17 +108,17 @@ pub extern "C" fn loreal_eq(a: *mut LorealValue, b: *mut LorealValue) -> bool {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_eq_int(a: i64, b: i64) -> bool {
     a == b
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_eq_bool(a: bool, b: bool) -> bool {
     a == b
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_alloc(size: usize) -> *mut c_void {
     unsafe {
         let header_size = std::mem::size_of::<RcHeader>();
@@ -133,7 +133,7 @@ pub extern "C" fn loreal_alloc(size: usize) -> *mut c_void {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_free(ptr: *mut c_void, size: usize) {
     unsafe {
         let header_size = std::mem::size_of::<RcHeader>();
@@ -145,7 +145,7 @@ pub extern "C" fn loreal_free(ptr: *mut c_void, size: usize) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_inc_rc(ptr: *mut c_void) {
     unsafe {
         let header_size = std::mem::size_of::<RcHeader>();
@@ -155,7 +155,7 @@ pub extern "C" fn loreal_inc_rc(ptr: *mut c_void) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn loreal_dec_rc(ptr: *mut c_void) -> bool {
     unsafe {
         let header_size = std::mem::size_of::<RcHeader>();

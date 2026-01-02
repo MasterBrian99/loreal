@@ -54,45 +54,6 @@ impl BorrowInferencer {
                     _ => {}
                 }
             }
-
-            fn check_value(&self, val: &crate::Value, param_usage: &mut HashMap<SmolStr, bool>) {
-                if let crate::Value::Var(name) = val {
-                    if param_usage.contains_key(name) {
-                        param_usage.insert(name.clone(), true);
-                    }
-                }
-            }
-
-            pub fn optimize_function(&self, func: &mut MirFunction) {
-                for block in func.cfg.node_weights_mut() {
-                    for instr in &mut block.instructions {
-                        self.optimize_instruction(instr);
-                    }
-                }
-            }
-
-            fn optimize_instruction(&self, instr: &mut Instruction) {
-                match instr {
-                    Instruction::Call { func, args } => {
-                        if let Some(params) = self.param_ownership.get(func) {
-                            if let Some(ownership) = params.get(
-                                args.get(0)
-                                    .and_then(|_| {
-                                        if let crate::Value::Var(name) = args.get(0)? {
-                                            Some(name)
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                    .unwrap_or(&SmolStr::new("")),
-                            ) {
-                                if *ownership == Ownership::Borrowed {}
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
         }
 
         let mut func_ownership = HashMap::new();
@@ -113,6 +74,37 @@ impl BorrowInferencer {
             if param_usage.contains_key(name) {
                 param_usage.insert(name.clone(), true);
             }
+        }
+    }
+
+    pub fn optimize_function(&self, func: &mut MirFunction) {
+        for block in func.cfg.node_weights_mut() {
+            for instr in &mut block.instructions {
+                self.optimize_instruction(instr);
+            }
+        }
+    }
+
+    fn optimize_instruction(&self, instr: &mut Instruction) {
+        match instr {
+            Instruction::Call { func, args, .. } => {
+                if let Some(params) = self.param_ownership.get(func) {
+                    if let Some(ownership) = params.get(
+                        args.get(0)
+                            .and_then(|arg| {
+                                if let crate::Value::Var(name) = arg {
+                                    Some(name)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or(&SmolStr::new("")),
+                    ) {
+                        if *ownership == Ownership::Borrowed {}
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

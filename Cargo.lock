@@ -362,8 +362,13 @@ name = "loreal_cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "loreal_ast",
  "loreal_lexer",
+ "loreal_mir",
+ "loreal_parser",
+ "loreal_semantic",
  "miette",
+ "smol_str",
 ]
 
 [[package]]
@@ -375,6 +380,7 @@ dependencies = [
  "loreal_ast",
  "loreal_mir",
  "smol_str",
+ "thiserror",
 ]
 
 [[package]]
@@ -399,6 +405,12 @@ dependencies = [
 [[package]]
 name = "loreal_parser"
 version = "0.1.0"
+dependencies = [
+ "loreal_ast",
+ "loreal_lexer",
+ "smol_str",
+ "thiserror",
+]
 
 [[package]]
 name = "loreal_runtime"
