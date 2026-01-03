@@ -2,6 +2,12 @@
 
 A purely functional language with compile-time reference counting.
 
+
+## Read the paper 
+
+
+see the [Research Paper](./Research_Paper.md).
+
 ## Features
 
 - Purely functional programming model
