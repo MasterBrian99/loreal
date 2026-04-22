@@ -1,67 +1,67 @@
-# Resource Management via Hardware-Aware Loop Specialization
+# Resource management via hardware-aware loop specialization
 
-**Abstract**
+## Abstract
 
-The development of high-performance functional programming languages faces a persistent conflict between the semantic benefits of pure immutability and the physical reality of resource-constrained hardware. Traditional approaches rely on non-deterministic tracing garbage collection (GC) or complex manual ownership types. This paper introduces a novel approach to deterministic resource management centered on **Hardware-Aware Loop Specialization** within the **Loreal** programming language. By leveraging the **Perceus** compile-time reference counting algorithm and a specialized `loop` control-flow construct, we demonstrate a system capable of achieving "Garbage-Free" execution and **Functional But In-Place (FBIP)** mutation with O(1) overhead. We formalize the semantics of the `loop` expression within the **Linear Resource Calculus ($\lambda^1$)**, proving that its explicit boundary definitions enable more aggressive memory reuse than general tail recursion. Implementation details within the Loreal compiler—including A-Normal Form (ANF) transformation, Mid-Level Intermediate Representation (MIR) liveness analysis, and LLVM-based conditional reuse blocks—are provided. Our evaluation shows that hardware-aware specialization allows functional loops to match the throughput and latency profiles of imperative mutations while maintaining strict referential transparency.
+Functional programming languages have long faced a real tension between the semantic clarity of pure immutability and what the hardware actually wants to do. The typical answers — tracing garbage collection or Rust-style ownership types — both have serious costs. This paper proposes a different route: **Hardware-Aware Loop Specialization** in a new language called **Loreal**.
+
+The idea is to combine the Perceus compile-time reference counting algorithm [1] with a dedicated `loop` control-flow construct that makes variable lifetimes explicit enough for the compiler to perform aggressive memory reuse. The goal is deterministic, garbage-free execution with Functional But In-Place (FBIP) mutation at O(1) overhead per iteration. We formalize the `loop` expression within Linear Resource Calculus ($\lambda^1$), and show that its explicit iteration boundaries allow more precise reuse analysis than general tail recursion. We describe the intended compiler pipeline — A-Normal Form (ANF) transformation, Mid-Level Intermediate Representation (MIR), liveness analysis, and LLVM codegen — and sketch correctness proofs for the key liveness invariants.
 
 ---
 
 ## 1. Introduction
 
-For decades, programming language design has been bifurcated into two distinct domains: high-level languages that prioritize developer productivity and safety through abstraction (e.g., Haskell, Java, Python), and low-level systems languages that prioritize hardware control and performance (e.g., C, C++, Rust). At the heart of this divide lies the problem of resource management.
+There is a version of this problem that never goes away. You want to write clean, safe, high-level code. You also want it to run fast on real hardware. These two goals are not, in principle, incompatible — but in practice, every major language family has made a tradeoff that hurts one side.
 
-Managed languages traditionally utilize tracing garbage collection (GC) to ensure memory safety. While effective at preventing classes of errors such as use-after-free, tracing GCs introduce non-deterministic latencies due to "stop-the-world" pauses and require significant memory headroom (often 2-3x the live data set) to maintain efficiency. Conversely, systems languages require manual management or sophisticated type systems like Rust's affine ownership to ensure safety. While these reach the performance ceiling of the hardware, they impose a significant cognitive load on the developer and can make certain functional patterns, like complex graph transformations or shared immutable state, difficult to express without resorting to unsafe escapes.
+Managed languages (Haskell, Java, Python) give you safety through garbage collection. The cost is non-deterministic pause times and significant memory overhead. Systems languages (C, C++, Rust) give you hardware control, but require either manual discipline or sophisticated type systems like Rust's affine ownership model, which imposes real cognitive load, especially when expressing functional patterns like shared immutable data.
 
-Recent advances in Reference Counting (RC) theory, specifically the **Perceus algorithm**, have suggested a third way. By performing reference counting at compile-time and inserting precise `dup` and `drop` instructions based on liveness analysis, it is possible to achieve deterministic, "garbage-free" execution. Under this model, values are reclaimed immediately after their last use, ensuring that the heap footprint is exactly proportional to the live set.
+The Perceus algorithm, developed by Reinking, Xie, de Moura, and Leijen [1] and demonstrated in the Koka language, suggests a third path. By performing reference counting at compile time and inserting precise `dup`/`drop` instructions based on liveness analysis, Perceus achieves deterministic, garbage-free execution. When a reference count drops to 1 just before a reallocation, the runtime can mutate in place. This is the FBIP paradigm: purely functional code that the compiler transforms into imperative-style memory operations, with no action required from the programmer.
 
-However, a critical bottleneck remains in the interaction between functional recursion and memory reuse. In a purely functional system, updating a data structure (e.g., a list or a tree) requires allocating a new node, leading to $O(N)$ allocation churn for $O(1)$ semantic changes. While tail-call optimization (TCO) mitigates stack growth, it does not inherently enable in-place mutation unless the compiler can prove that the reference to the old node is unique.
+The problem we are addressing here is subtler. Even with Perceus, functional recursion obscures variable lifetimes in ways that block reuse. When a recursive call is live in a stack frame, the compiler cannot prove that a reference count is 1, so it cannot perform the in-place mutation. This is not a fundamental limitation of reference counting — it is a limitation of using recursion as the primary iteration mechanism.
 
-This paper proposes **Hardware-Aware Loop Specialization** as a solution. We introduce a specialized `loop` expression that replaces general recursion for iterative tasks. Unlike recursion, which obscures variable lifetimes across stack frames, the Loreal `loop` construct makes the scope and expiration of iteration variables explicit. This enables the compiler to perform **Reuse Analysis** with higher precision, transforming functional updates into efficient in-place mutations—a paradigm known as **Functional But In-Place (FBIP)**.
+Loreal introduces an explicit `loop` expression to solve this. Unlike recursion, `loop` is lowered directly to a CFG loop in the current scope. The `next` keyword — which signals the next iteration — acts as a kill point for current-iteration variables. This gives the compiler the proof it needs: variables consumed before `next` are definitively dead, RC drops to 1, and in-place mutation is safe.
 
 ### 1.1 Contributions
 
-This work makes the following contributions:
-1.  **Formalization of the `loop` Expression**: We define the operational and denotational semantics of an expression-based loop construct that integrates natively with the Linear Resource Calculus.
-2.  **Hardware-Aware Specialization**: We describe how the compiler utilizes the explicit boundaries of the `loop` construct to optimize register allocation and bypass the overhead of standard tail-recursive liveness analysis.
-3.  **End-to-End Implementation**: We detail the transformation pipeline from high-level Loreal source to LLVM IR, specifically highlighting the integration of the Perceus algorithm within A-Normal Form (ANF).
-4.  **Mathematical Correctness Proofs**: We provide a formal proof that the `loop` construct's liveness invariants guarantee the satisfaction of the reuse predicate $\Phi$ for common data structure transformations.
+This paper makes four claims:
+
+1. A formal definition of the `loop` expression within Linear Resource Calculus, including small-step operational semantics.
+2. A description of how explicit iteration boundaries enable more aggressive reuse analysis than tail recursion.
+3. A compiler pipeline design from Loreal source to LLVM IR, covering ANF, MIR CFG construction, Perceus insertion, and FBIP reuse passes.
+4. A proof sketch that the `loop` construct preserves the uniqueness invariant required for FBIP across iteration boundaries.
 
 ---
 
-## 2. Background: The Renaissance of Reference Counting
+## 2. Background
 
-To contextualize our work, we must examine the evolution of memory management strategies in functional systems.
+### 2.1 Tracing GC vs. reference counting
 
-### 2.1 Tracing vs. Reference Counting
+George Collins introduced reference counting in 1960 [2] as an alternative to the mark-sweep approach McCarthy had used in Lisp. The tradeoff has been well understood ever since. Tracing collectors batch their work, which gives high throughput in allocation-heavy workloads — allocation is a pointer bump, deallocation happens in bulk. But they have non-deterministic pause times and typically need 2–3× the live data set in memory to operate efficiently [3].
 
-The historical preference for Tracing GC stems from its high throughput in allocation-heavy functional programs. In a tracing system, allocation is a simple pointer bump, and deallocation is a batch process. However, the lack of determinism is a fatal flaw for systems programming. Reference Counting (RC), introduced by Collins in 1960, offers determinism but has historically suffered from three main issues:
-1.  **Throughput Overhead**: Constant incrementing and decrementing of counters saturates the memory bus.
-2.  **Concurrency**: Atomic RC operations in multi-threaded contexts are significantly slower.
-3.  **Cycles**: Standard RC cannot reclaim cyclic structures.
+Reference counting is the opposite in almost every way: deterministic, incremental, memory-proportional. But historically it has suffered three problems. First, constant counter updates saturate the memory bus. Second, atomic RC operations in multi-threaded contexts are expensive. Third, standard RC cannot reclaim cycles at all.
 
-### 2.2 The Perceus Algorithm and $\lambda^1$
+### 2.2 Perceus and $\lambda^1$
 
-The **Perceus** algorithm (Reinking et al.) revitalizes RC by shifting the burden of management from the runtime to the compiler. Perceus utilizes **Linear Resource Calculus ($\lambda^1$)**, a type system where values are treated as resources that must be consumed or explicitly dropped.
-
-The central mechanism of Perceus is **Precise Liveness Analysis**. Instead of dropping values at the end of a block (as in C++ RAII or Rust), Perceus identifies the exact instruction of the last read. 
+The Perceus algorithm [1] revisits reference counting from a compiler design perspective rather than a runtime perspective. It works within Linear Resource Calculus ($\lambda^1$), a type system where values are treated as resources that must be either consumed or explicitly dropped. Perceus performs precise liveness analysis to find the exact last-use point $k_v$ for each value $v$:
 
 $$k_v = \max \{ i \mid i \in \text{Instructions} \land v \in \text{ReadSet}(i) \}$$
 
-By inserting `drop(v)` at $k_v$, the compiler ensures the program is "garbage-free."
+It inserts `drop(v)` at $k_v$ rather than at block exit (as in C++ RAII) or at GC collection time. This guarantees garbage freedom: the heap contains only live objects. It also enables the reuse optimization described below.
+
+The Perceus paper received a Distinguished Paper Award at PLDI'21 and is implemented in the Koka language [4].
 
 ### 2.3 Functional But In-Place (FBIP)
 
-The most transformative aspect of Perceus is **Reuse Analysis**. If a constructor is dropped immediately before a new one is allocated, and the compiler can prove both have the same size, it can replace the `free` and `malloc` calls with a `reuse` operation. At runtime, if the reference count is 1, the memory is mutated in-place. If the count is > 1, a new allocation occurs. This allows functional code to reach imperative performance levels without sacrificing purity.
+The most consequential outcome of precise RC is **reuse analysis**. If the compiler observes a `drop(x)` immediately followed by `alloc(y)` where `sizeof(x) = sizeof(y)`, it can replace both operations with a single `reuse` token. At runtime, if $RC(x) = 1$, the memory is mutated in place. If $RC(x) > 1$, a standard allocation occurs. The programmer writes purely functional code; the compiler generates imperative mutations where safe.
+
+This paradigm was first articulated by Wadler in the context of linear types [5] and concretely demonstrated by the Perceus/Koka work. Lorenzen and Leijen later extended it with frame-limited reuse [6], tightening the conditions under which reuse tokens can be generated.
 
 ---
 
-## 3. Hardware-Aware Loop Specialization
+## 3. Hardware-aware loop specialization
 
-The core thesis of this paper is that the standard functional reliance on recursion for iteration limits the effectiveness of FBIP optimizations. We propose the `loop` construct as a hardware-aware alternative.
+### 3.1 Why recursion limits reuse
 
-### 3.1 The Semantic Gap of Recursion
-
-Consider a standard map function using recursion:
+The standard functional idiom for iteration is recursion. Consider a map function:
 
 ```elixir
 def map(list, f) do
@@ -72,13 +72,16 @@ def map(list, f) do
 end
 ```
 
-In this pattern, the `Cons` node of the input list remains "potentially live" in the current stack frame while the recursive call to `map(xs, f)` is executing. Even if `xs` is passed by value, the caller's frame technically holds a reference to the head until the call returns. This prevents the Reference Count (RC) of the list node from hitting 1 during the construction of the new node, thereby disabling reuse.
+In the `Cons(f(x), map(xs, f))` line, the current `Cons` node is still live when `map(xs, f)` executes. Even in continuation-passing style or with tail-call optimization, the caller's reference to the current node prevents its RC from reaching 1 during the construction of the new node. Reuse is blocked.
 
-### 3.2 The Loreal `loop` Construct
+This is not a fundamental property of RC. It is a consequence of the way recursion encodes variable lifetimes: the scope of a binding does not end until the function returns, so the compiler cannot prove uniqueness at the allocation site.
 
-Loreal introduces an explicit `loop` expression designed to maximize reuse opportunities by narrowing the liveness window of iteration variables.
+### 3.2 The `loop` construct
+
+Loreal introduces an explicit `loop` expression. Its defining property is that `next` — the signal to continue iterating — acts as a hard kill point for all bindings in the current iteration.
 
 **Syntax:**
+
 ```rust
 loop (init_val) (var) -> {
   if (condition) {
@@ -89,120 +92,118 @@ loop (init_val) (var) -> {
 }
 ```
 
-The `loop` construct is an expression that evaluates to the value passed to `break`. The `next` keyword signals a transition to the next iteration, while `break` signals termination.
+The expression evaluates to the value passed to `break`. Variables bound in the loop body are not in scope after `next` executes. The compiler treats this as a guarantee, not a hint.
 
-### 3.3 Hardware-Awareness and CFG Transformation
+### 3.3 CFG lowering and the kill-point guarantee
 
-Unlike recursion, which is lowered to a function call and return, the `loop` construct is lowered directly to a **Control Flow Graph (CFG)** loop within the current function scope. This has immediate benefits for hardware utilization:
+Unlike recursion, which lowers to a function call and return, the `loop` construct lowers directly to a CFG loop in the current function scope. This has two hardware-relevant consequences:
 
-1.  **Register Stability**: Loop variables can be cached in registers throughout the iteration, avoiding the save/restore overhead of the stack.
-2.  **Explicit Lifetimes**: The compiler treats the call to `next` as a "kill point" for all variables bound in the current iteration.
+1. Loop variables can live in registers across iterations, avoiding save/restore overhead.
+2. The `next` boundary is the explicit kill point at which the compiler inserts drops for variables not forwarded to the next iteration.
 
 ```mermaid
 graph TD
-    Entry[Loop Entry: Bind Init Values] --> Header{Header}
-    Header --> Body[Evaluate Loop Body]
+    Entry[Loop entry: bind init values] --> Header{Header}
+    Header --> Body[Evaluate loop body]
     Body --> Choice{next or break?}
-    Choice -->|next| Update[Update Loop Vars]
-    Update -->|Drop Old Vars| Header
-    Choice -->|break| Exit[Loop Exit: Return Value]
+    Choice -->|next| Update[Update loop vars]
+    Update -->|Drop old vars| Header
+    Choice -->|break| Exit[Loop exit: return value]
 ```
 
-**Figure 1: CFG Representation of the `loop` Expression**
+**Figure 1: CFG representation of the `loop` expression**
 
-In the Loreal compiler, the `next` expression triggers the **Drop Rule** for the current iteration variables *before* the jump back to the header. This guarantees that if a variable was unique at the start of the body, its RC will be 1 when the new state is computed, enabling in-place mutation of the loop state itself.
+Because `drop` is inserted before the back-edge jump to the header, any variable that was unique at the start of the body will have $RC = 1$ when the next allocation executes. The reuse predicate is satisfied structurally, not just opportunistically.
 
 ---
 
-## 4. Mathematical Foundation: The Logic of Specialization
+## 4. Formal foundation
 
-We formalize the `loop` construct within the context of **Linear Resource Calculus ($\lambda^1$)**.
+We formalize `loop` within Linear Resource Calculus ($\lambda^1$) following the framework established by Perceus [1].
 
-### 4.1 Resource-Aware Typing Judgment
+### 4.1 Resource-aware typing
 
-A typing judgment in Loreal tracks the state of the context $\Gamma$ (input resources) and $\Delta$ (output resources):
+A typing judgment in Loreal tracks input resources $\Gamma$ and output resources $\Delta$:
 
 $$\Gamma \vdash e : \tau \mid \Delta$$
 
-This suggests that evaluating expression $e$ consumes the differences between $\Gamma$ and $\Delta$.
+Evaluating $e$ consumes the difference between $\Gamma$ and $\Delta$. A well-typed program has a balanced resource ledger.
 
-### 4.2 Operational Semantics of `loop`
+### 4.2 Operational semantics of `loop`
 
-We define the small-step operational semantics for the `loop` expression. Let $\sigma$ represent the heap and $E$ represent the evaluation context.
+Let $\sigma$ be the heap and $E$ an evaluation context. We define three rules:
 
-**[LOOP-START]**
+**[LOOP-START]** — substitute initial values for loop variables:
 $$\langle E[\text{loop } \vec{v} \, \vec{x} \to B], \sigma \rangle \rightarrow \langle E[B[\vec{x}/\vec{v}]], \sigma \rangle$$
 
-**[NEXT-ITER]**
-$$\langle E[\text{next } \vec{u}], \sigma \rangle \rightarrow \langle \text{drop}(\vec{x}); E[\text{loop } \vec{u} \, \vec{x} \to B], \sigma \rangle$$
+**[NEXT-ITER]** — drop current variables before the back edge:
+$$\langle E[\text{next } \vec{u}], \sigma \rangle \rightarrow \langle \text{drop}(\vec{x}); \, E[\text{loop } \vec{u} \, \vec{x} \to B], \sigma \rangle$$
 
-**[BREAK-TERM]**
-$$\langle E[\text{break } v], \sigma \rangle \rightarrow \langle \text{drop}(\vec{x}); v, \sigma \rangle$$
+**[BREAK-TERM]** — drop remaining variables on exit:
+$$\langle E[\text{break } v], \sigma \rangle \rightarrow \langle \text{drop}(\vec{x}); \, v, \sigma \rangle$$
 
-The critical insight is the explicit `drop(\vec{x})` that precedes every iteration and termination. In standard recursion, this drop is deferred until the function returns. By forcing the drop at the `next` boundary, we mathematically guarantee **Garbage Freedom** at the transition point.
+The explicit `drop(\vec{x})` in both NEXT-ITER and BREAK-TERM is the key difference from recursion. In a recursive encoding, this drop is deferred to the function's return. Here it is part of the iteration semantics.
 
-### 4.3 Correctness of the Reuse Predicate
+### 4.3 The reuse predicate
 
-The **Reuse Predicate** $\Phi(x, y)$ is defined as:
+The reuse predicate $\Phi(x, y)$ holds when $x$ and $y$ have the same memory layout:
 
 $$\Phi(x, y) \iff (\text{sizeof}(x) = \text{sizeof}(y)) \land (\text{repr}(x) \equiv \text{repr}(y))$$
 
-In a `loop` context, consider an iteration that updates a record $R$:
-`next(R { field: new_val })`
+In a `loop` context, consider a body that calls `next(R { field: new_val })`. The compiler elaborates this as:
 
-The compiler elaborates this to:
-1.  Read `old_val` from $R$.
-2.  `drop(R)` (RC hits 0 if unique).
-3.  `alloc(R')`.
-4.  Write `new_val` to $R'$.
+1. Read `old_val` from $R$.
+2. `drop(R)` — RC hits 0 if $R$ is unique.
+3. `alloc(R')` with the same type.
+4. Write `new_val` to $R'$.
 
-Because the `drop(R)` occurs inside the loop body before the allocation of $R'$, the compiler satisfies $\Phi$ and generates a **Reuse Token**.
+Because `drop(R)` precedes `alloc(R')` within the same basic block, the compiler detects the pattern and generates a reuse token. The runtime takes the mutation path when $RC(R) = 1$.
 
 ---
 
-## 5. Implementation Architecture
+## 5. Compiler architecture
 
-The Loreal compiler implements loop specialization through a series of deterministic transformations.
+The Loreal compiler transforms source programs through a series of intermediate representations before emitting LLVM IR.
 
-### 5.1 A-Normal Form (ANF) Transformation
+### 5.1 A-Normal Form
 
-The first phase of the backend flattens complex expressions into ANF. This is crucial for resource management because it names every intermediate value, allowing the liveness analyzer to calculate precise kill points.
+ANF transformation names every intermediate value, which is a prerequisite for precise liveness analysis. Without ANF, compound expressions can hide shared references.
 
 ```mermaid
 graph LR
-    Source[Loreal Source] --> AST[Abstract Syntax Tree]
+    Source[Loreal source] --> AST[Abstract Syntax Tree]
     AST --> ANF[A-Normal Form]
     ANF --> MIR[Mid-Level IR]
-    MIR --> Opt[FBIP & RC Passes]
+    MIR --> Opt[RC + FBIP passes]
     Opt --> LLVM[LLVM IR]
-    LLVM --> Binary[Native Binary]
+    LLVM --> Binary[Native binary]
 ```
-**Figure 2: The Loreal Compiler Pipeline**
 
-*Original:* `next(list_map(xs, f))`
-*ANF:*
+**Figure 2: The Loreal compiler pipeline**
+
+For example, `next(list_map(xs, f))` becomes:
+
 ```rust
 let t1 = list_map(xs, f);
 next(t1);
 ```
 
-In the `loreal_mir` crate, the `ANFTransformer` ensures that the operands of `next` and `break` are always atomic values (variables or constants), simplifying the CFG construction.
+The `ANFTransformer` in `loreal_mir` ensures that operands to `next` and `break` are always atomic values, which simplifies CFG construction and makes the kill-point analysis unambiguous.
 
-### 5.2 MIR CFG Construction
+### 5.2 MIR CFG construction
 
-The Mid-Level Intermediate Representation (MIR) represents the function as a graph of basic blocks. The `MirBuilder` processes the `ast::Expr::Loop` by creating three distinct block types:
-*   **Header**: The merge point for initialization and iteration jumps.
-*   **Body**: Where the logic and `reuse_or_alloc` decisions reside.
-*   **Exit**: The terminal block that passes the result to the caller.
+The MIR represents functions as graphs of basic blocks. The `MirBuilder` processes `ast::Expr::Loop` by generating three distinct block types:
 
-The `loreal_mir/src/lib.rs` file provides the `lower_expr` method which handles this transformation.
+- **Header**: the merge point for the initial entry and all back edges from `next`.
+- **Body**: where the user logic and `reuse_or_alloc` decisions live.
+- **Exit**: the block that passes the `break` value back to the caller.
 
-### 5.3 Perceus Insertion and Reuse Analysis
+### 5.3 RC insertion and reuse analysis
 
-Once the CFG is constructed, the `RcInserter` (Perceus) and `ReuseAnalyzer` (FBIP) passes are executed. The `ReuseAnalyzer` performs a greedy scan within basic blocks for the `drop(x) -> alloc(y)` pattern.
+Once the CFG exists, the `RcInserter` (Perceus) and `ReuseAnalyzer` (FBIP) passes run in sequence. The `ReuseAnalyzer` performs a greedy intra-block scan for the `drop(x) → alloc(y)` pattern:
 
 ```rust
-// loreal_mir/src/reuse.rs
+// loreal_mir/src/reuse.rs (design sketch)
 fn analyze_block(&mut self, _node_idx: NodeIndex, block: &BasicBlock) {
     let mut last_drop: Option<(usize, SmolStr)> = None;
     for (idx, instr) in block.instructions.iter().enumerate() {
@@ -215,29 +216,27 @@ fn analyze_block(&mut self, _node_idx: NodeIndex, block: &BasicBlock) {
                     }
                 }
             }
-            // ...
+            _ => {}
         }
     }
 }
 ```
 
-### 5.4 LLVM Codegen: Conditional Reuse Blocks
+### 5.4 LLVM codegen: conditional reuse blocks
 
-The final phase lowers MIR to LLVM IR using the `inkwell` crate. A `Reuse` instruction is expanded into a runtime check of the reference count.
+A reuse token lowers to an RC check at the LLVM level:
 
 ```llvm
-; LLVM Pseudo-IR for Reuse
+; Pseudo-IR for conditional reuse
   %rc = load i64, i64* %ptr_rc
   %is_unique = icmp eq i64 %rc, 1
   br i1 %is_unique, label %reuse_block, label %alloc_block
 
 reuse_block:
-  ; In-place mutation
   store %val, %ptr_data
   br label %continue
 
 alloc_block:
-  ; Standard allocation
   call void @loreal_dec(%ptr)
   %new_ptr = call i8* @loreal_alloc(%size)
   br label %continue
@@ -245,32 +244,29 @@ alloc_block:
 
 ```mermaid
 flowchart TD
-    Start([Start Resource Allocation]) --> IsUnique{RC == 1?}
-    IsUnique -- Yes --> Reuse[Reuse Memory In-Place]
-    IsUnique -- No --> Dec[Decrement Old RC]
-    Dec --> Alloc[Allocate New Block]
-    Reuse --> Update[Update Fields]
+    Start([Start resource allocation]) --> IsUnique{RC == 1?}
+    IsUnique -- Yes --> Reuse[Reuse memory in-place]
+    IsUnique -- No --> Dec[Decrement old RC]
+    Dec --> Alloc[Allocate new block]
+    Reuse --> Update[Update fields]
     Alloc --> Update
-    Update --> End([Return Pointer])
+    Update --> End([Return pointer])
 ```
-**Figure 3: Functional But In-Place (FBIP) Decision Logic**
 
-This ensures that the "Hardware-Aware" promise is fulfilled: the machine only performs expensive heap allocations when data is truly shared.
+**Figure 3: FBIP decision logic at the LLVM level**
 
-### 5.5 Precise Liveness Analysis in `liveness.rs`
+### 5.5 Liveness analysis
 
-The effectiveness of loop specialization is inextricably linked to the precision of the liveness analyzer located in `crates/loreal_mir/src/liveness.rs`. Standard liveness analysis often uses a pessimistic approach at loop boundaries, assuming that any variable used within the loop might be live throughout all iterations.
-
-Loreal's analyzer implementation utilizes a **Backward Flow Analysis** on the CFG. For each basic block $B$, it computes two sets: $LiveIn(B)$ and $LiveOut(B)$.
+The precision of the whole system depends on the liveness analyzer in `crates/loreal_mir/src/liveness.rs`. The design uses backward flow analysis over the CFG. For each basic block $B$:
 
 $$LiveOut(B) = \bigcup_{S \in \text{Succ}(B)} LiveIn(S)$$
 $$LiveIn(B) = Gen(B) \cup (LiveOut(B) \setminus Kill(B))$$
 
-In the context of the `loop` construct, the $LiveIn(LoopHeader)$ is calculated by considering both the entry edge and the back-edge from $Body$ (via `next`). Because the `next` terminator explicitly calls `drop` on iteration variables that are not part of the next state, the $Kill(Body)$ set is aggressively populated. This prevents variables from "leaking" into subsequent iterations, which is the primary driver of the FBIP reuse success.
+For loop bodies, the `next` terminator explicitly populates $Kill(Body)$ with any variable not forwarded to the next iteration. This keeps variables from appearing live across iteration boundaries when they have no semantic use there — which is the precise condition that enables reuse.
 
-### 5.6 Runtime Support: The `loreal_runtime` Crate
+### 5.6 Runtime layout
 
-The MIR instructions are eventually supported by a thin runtime layer implemented in C or Rust (located in `crates/loreal_runtime`). This layer manages the `RcObject` header:
+The runtime layer (in `crates/loreal_runtime`) manages the `RcObject` header.
 
 ```mermaid
 classDiagram
@@ -280,19 +276,20 @@ classDiagram
         +uint64_t type_tag
         +void* data_payload
     }
-    note for RcObject "Header (24 bytes) precedes the data pointer"
+    note for RcObject "24-byte header precedes the data pointer"
 ```
-**Figure 4: Memory Layout of a Loreal Heap Object**
 
-The header is 24 bytes, ensuring 8-byte alignment for the subsequent data payload. The `loreal_alloc` function returns a pointer to the *end* of the header, allowing the compiler to use positive offsets for data access (e.g., `ptr[0]` for the first field) and negative offsets for reference counting (e.g., `ptr[-8]` for the refcount). This "Negative Offset Header" pattern is a classic hardware-aware optimization that keeps the data pointer pointing directly at the start of the payload, improving the efficiency of field access instructions in the LLVM backend.
+**Figure 4: Memory layout of a Loreal heap object**
+
+The header is 24 bytes (three 64-bit words), and the data pointer points to the byte immediately after the header. Field access uses positive offsets from the data pointer; RC manipulation uses negative offsets (e.g., `ptr[-8]` for the refcount). This keeps data-access instructions clean in the LLVM backend — a straightforward application of the negative-offset header pattern used in Koka's C backend [4].
 
 ---
 
-## 6. Case Study: FBIP in Recursive Data Structures
+## 6. Case study: FBIP filter on a linked list
 
-To demonstrate the power of loop specialization, we analyze the implementation of a `filter` function on a linked list. Standard functional filter implementations are often written using recursion, leading to $O(N)$ allocation even if most elements are retained.
+### 6.1 Recursive version
 
-### 6.1 Recursive Filter (Pessimistic)
+The standard functional filter accumulates results through recursion:
 
 ```elixir
 def filter(list, p) do
@@ -300,7 +297,7 @@ def filter(list, p) do
     Nil -> Nil
     Cons(x, xs) ->
       if p(x) do
-        Cons(x, filter(xs, p)) // Allocation occurs before recursive call returns
+        Cons(x, filter(xs, p))
       else
         filter(xs, p)
       end
@@ -308,11 +305,11 @@ def filter(list, p) do
 end
 ```
 
-In the `Cons(x, filter(xs, p))` line, the caller must allocate a new `Cons` node to hold the result of the recursive call. The original node cannot be reused because it is technically still live until the `match` block concludes.
+The `Cons(x, filter(xs, p))` call must allocate a new node before the recursive result is known. The original node is still live during the recursive call, so its RC cannot reach 1, and reuse is blocked.
 
-### 6.2 Specialized Loop Filter (Optimized)
+### 6.2 Loop version
 
-By using the `loop` construct with an accumulator and the `reuse_or_alloc` mechanism, Loreal transforms this into an iterative process that repurposes the existing nodes.
+The `loop` version makes the consumed-and-rebuilt pattern explicit:
 
 ```rust
 def filter_loop(list, p) do
@@ -321,7 +318,6 @@ def filter_loop(list, p) do
       Nil -> break(reverse(acc))
       Cons(x, xs) ->
         if p(x) do
-          // Reuse candidate: curr can be mutated to point to xs
           next(xs, Cons(x, acc))
         else
           next(xs, acc)
@@ -331,170 +327,191 @@ def filter_loop(list, p) do
 end
 ```
 
-In the `Cons(x, acc)` call, the compiler notices that `curr` was just matched and its components `x` and `xs` were extracted. The variable `curr` itself is no longer live. The `ReuseAnalyzer` identifies `drop(curr)` followed by `alloc(Cons)`. Since both are list nodes, they are compatible. 
+After destructuring `curr` into `x` and `xs`, `curr` is no longer live. The `ReuseAnalyzer` sees `drop(curr)` immediately before `alloc(Cons)`, detects the type compatibility, and emits a reuse token.
 
-**Trace Analysis**:
-1.  `curr` points to Node A. $RC(A) = 1$.
-2.  Match `Cons(x, xs)`: `x` and `xs` increments (if they are heap objects).
-3.  $LiveIn(if)$ contains `x, xs, acc, p`.
-4.  If $p(x)$ is true:
-    -   `alloc(Cons)` is requested for the new `acc`.
-    -   `Reuse(curr, new_acc)` is generated.
-    -   Runtime check: $RC(A) = 1$.
-    -   **Mutation**: Node A's fields are overwritten with `x` and the old `acc`.
-    -   The loop continues with Node A as the new `acc`.
+Execution trace for the `p(x) = true` branch:
 
-Through this specialization, the `filter` function executes with **zero net allocations** if the input list is uniquely owned. This represents a significant breakthrough in functional performance, matching the behavior of an imperative "in-place" filter.
+1. `curr` points to Node A. $RC(A) = 1$.
+2. Pattern match extracts `x` and `xs` from Node A.
+3. `curr` leaves the live set.
+4. `alloc(Cons)` is requested for the new accumulator head.
+5. Reuse analysis matches the `drop(curr)` / `alloc(Cons)` pair.
+6. Runtime check: $RC(A) = 1$ → mutation path taken.
+7. Node A's fields are overwritten with `x` and the old `acc`.
+8. `next(xs, NodeA)` — the loop continues with Node A repurposed as the new accumulator head.
+
+If the input list is uniquely owned throughout, the filter executes with zero net heap allocations. The result list is built entirely from the nodes of the input list.
 
 ---
 
-## 7. Performance Modeling and Evaluation
+## 7. Performance analysis
 
-The performance of Loreal's specialized loops is not merely an empirical observation but a predictable outcome of its architectural design. We model the performance along three primary axes: Throughput, Latency, and Cache Locality.
+The performance model has three components. These are theoretical projections from the design; no benchmarks exist yet.
 
-### 7.1 Allocation Throughput
+### 7.1 Allocation throughput
 
-In traditional functional languages, allocation throughput is dominated by the speed of the tracing GC's nursery. Allocation is a pointer bump, but the cost is deferred to the collection phase. In Loreal, naive reference counting would be significantly slower due to the overhead of `malloc` and `free` for every temporary node.
-
-However, the hardware-aware loop construct alters this equation by maximizing the "hit rate" of the Reuse Analysis. We define the **Reuse Efficiency ($E_r$)** as:
+Allocation throughput in a naive RC system is dominated by `malloc`/`free` costs. The reuse analysis eliminates these for uniquely owned, iteratively transformed structures. We define **reuse efficiency** as:
 
 $$E_r = \frac{N_{reuse}}{N_{alloc} + N_{reuse}}$$
 
-In an iterative loop where a local data structure is transformed (e.g., a filter operation that constructs a new list), $E_r$ approaches 1.0. In this state, the throughput of the functional loop becomes identical to an imperative `while` loop, as the machine only performs memory writes to existing addresses.
+For a `loop` that transforms a locally owned data structure, $E_r$ should approach 1.0. At that point, the inner loop does only memory writes to already-resident addresses, which is behaviorally identical to an imperative `while` loop.
 
-### 7.2 Latency and Real-Time Guarantees
+### 7.2 Latency
 
-The most significant advantage of the Loreal model is the elimination of non-deterministic pauses. Tracing GCs are "amortized" systems; they provide high throughput at the cost of periodic latency spikes. Loreal's RC-based model is "incremental." The cost of memory management is distributed evenly across the execution path.
+Tracing GCs amortize deallocation cost over time, producing high throughput at the cost of pause spikes. Loreal's RC model distributes cost evenly across the execution path. Deep recursive drops (e.g., dropping a long list) are a potential latency concern, but iterative drop specialization — where the compiler generates iterative deallocation loops rather than recursive ones — keeps stack depth bounded and pause time proportional to the number of nodes freed, not their nesting depth.
 
-We model the maximum pause time ($T_{pause}$) as the time required to drop a single data structure. While recursive drops of deep structures (e.g., a long linked list) can take $O(N)$ time, Loreal implements **Iterative Drop Specialization**. The compiler generates glue code that flattens recursive drops into iterative loops, ensuring that even for large structures, deallocation occurs in constant stack space and predictable time.
+### 7.3 Cache behavior
 
-### 7.3 Cache Locality and the "Pre-heated" L1
+When the reuse path is taken, the CPU writes to an address it just read within the same basic block. The cache line is already present in L1. Compared to the `free` → `malloc` path (which may return a different address from a different cache line), the reuse path eliminates a cache miss per iteration. This is the concrete mechanism behind the "hardware-aware" framing: the optimization works because of how modern CPU caches behave, not just in the abstract.
 
-Modern CPUs are highly sensitive to cache locality. Tracing GCs often move objects in memory (compaction), which can invalidate cache lines. Furthermore, a `free` followed by a `malloc` might return a different memory address, forcing the CPU to fetch a new cache line from L3 or Main Memory.
+### 7.4 Projected comparison
 
-Loreal's FBIP optimization preserves the "Pre-heated" state of the L1 cache. When a node is reused, the CPU is writing to a memory address that was just read in the same basic block. The cache line is already in the L1 (and likely the registers). This reduces the **Cycles Per Instruction (CPI)** by eliminating the deallocation/allocation latency and the resulting cache misses.
+The following comparison is a design projection, not a measurement. It assumes an iterative data transformation workload on a uniquely owned structure.
 
 ```text
-Performance Comparison (Normalized Execution Time)
-Lower is better.
+Projected normalized execution time (lower is better)
+Design target, not measured data.
 
-  [Imperative C]  | ##### (1.0)
-  [Loreal FBIP]   | ###### (1.2)
-  [Haskell GC]    | ################ (3.2)
-  [Java GC]       | #################### (4.0)
-  +--------------------------------------------------
-    0.0    1.0    2.0    3.0    4.0
+  [Imperative C]    |##### (1.0x)
+  [Loreal FBIP]     |###### (1.1–1.3x expected)
+  [Koka FBIP]       |####### (similar range, per [1])
+  [Haskell GHC]     |################ (~3x on GC-heavy workloads, per [3])
+  [Java HotSpot]    |##################### (~4x on allocation-heavy paths, per [3])
 ```
-**Figure 5: Bimodal Performance Comparison for Iterative Data Transformation**
+
+**Figure 5: Projected performance comparison**
+
+The Loreal target is to stay within 10–30% of C for iterative transformation workloads. The Perceus paper [1] shows Koka achieving competitive numbers against GHC and Java on comparable benchmarks; Loreal's loop construct aims for the same or better reuse hit rate by making the kill-point structural rather than inferred.
 
 ---
 
-## 8. Formal Proof: Preservation of Liveness and Uniqueness
+## 8. Correctness: preservation of uniqueness across iterations
 
-To prove the correctness of our specialization, we demonstrate that the `loop` construct preserves the uniqueness property required for FBIP.
+### 8.1 The uniqueness invariant
 
-### 8.1 The Uniqueness Invariant
+Let $U(x, B)$ be true when $x$ is unique in block $B$ (i.e., $RC(x) = 1$).
 
-Let $U(x, B)$ be a predicate that is true if variable $x$ is unique in block $B$. Uniqueness implies that $RC(x) = 1$.
+**Lemma 1 (Uniqueness preservation):** If $U(x, B_n)$ holds at the start of iteration $n$, and $x$ is consumed in $B_n$ followed by a reuse allocation for $x'$, then $U(x', B_{n+1})$ holds.
 
-**Lemma 1**: If $U(x, B_n)$ is true at the start of iteration $n$, and $x$ is consumed within $B_n$ followed by a reuse operation for $x'$, then $U(x', B_{n+1})$ is true.
+**Proof sketch:**
 
-**Proof**:
-1.  By the operational semantics of `next`, the current iteration variables $\vec{x}$ are dropped before the update $\vec{u}$ is applied.
-2.  The Reuse Analyzer detects the drop of $x$ and replaces the allocation of $x'$ with a `reuse` token.
-3.  Because $RC(x) = 1$, the runtime takes the mutation path.
-4.  The new pointer $x'$ points to the same memory block. Since no other references were created during the transition (verified by liveness analysis), $RC(x')$ remains 1.
-5.  Thus, the uniqueness invariant is maintained across iteration boundaries. $\square$
-
----
-
-## 9. Comparative Landscape: Loreal vs. The World
-
-The Loreal approach exists at the intersection of several established paradigms. Table 1 provides a comparative overview.
-
-| Feature | Loreal (`loop` + FBIP) | Rust (Ownership) | Koka (Perceus) | Haskell (Tracing GC) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Purity** | Purely Functional | Imperative/Functional | Purely Functional | Purely Functional |
-| **Memory Model** | Compile-time RC | Affine Types | Compile-time RC | Tracing GC |
-| **Reuse** | Implicit (FBIP) | Explicit (`mut`) | Implicit (Reuse) | None (Alloc) |
-| **Iteration** | Specialized Loop | `for`/`while` | Tail Recursion | Recursion |
-| **Determinism** | High | High | High | Low |
-
-**Table 1: Comparative Analysis of Memory Management Strategies**
-
-### 9.1 Comparison with Rust
-
-Rust provides similar performance guarantees but requires the developer to manage lifetimes and mutability explicitly. Loreal allows the developer to write pure, high-level code while the compiler automatically infers the "mutation points." This reduces the "borrow checker friction" while achieving equivalent machine performance.
-
-### 9.2 Comparison with Koka and Lean 4
-
-Koka first popularized the Perceus algorithm. Loreal builds upon Koka's work by introducing the `loop` expression. In Koka, FBIP is often reliant on the optimization of tail-recursive functions. If a function is not in perfect tail-call position, reuse analysis can fail. Loreal's `loop` construct is an **intrinsic** part of the AST, ensuring that the compiler always treats it as a specialization candidate, regardless of the surrounding call-site complexity.
+1. By [NEXT-ITER], the current iteration variables $\vec{x}$ are dropped before the back-edge jump. This is structural, not optional.
+2. The `ReuseAnalyzer` detects the `drop(x)` / `alloc(x')` pair and replaces them with a reuse instruction.
+3. $U(x, B_n)$ guarantees $RC(x) = 1$, so the runtime takes the in-place mutation path.
+4. The new pointer $x'$ points to the same block. Liveness analysis confirms that no other reference to this block was created during the iteration body (if one were, $x$ would not be in $Kill(Body)$ and the reuse instruction would not have been emitted).
+5. Therefore $RC(x') = 1$ and $U(x', B_{n+1})$ holds. $\square$
 
 ---
 
-## 10. Implementation Challenges and Design Decisions
+## 9. Comparison with related work
 
-Developing the Loreal backend required resolving several subtle conflicts between functional semantics and hardware efficiency.
+| Feature               | Loreal (`loop` + FBIP)       | Rust (ownership)      | Koka (Perceus)                      | Haskell (GHC)     |
+| :-------------------- | :--------------------------- | :-------------------- | :---------------------------------- | :---------------- |
+| Purity                | Purely functional            | Imperative/functional | Purely functional                   | Purely functional |
+| Memory model          | Compile-time RC              | Affine types          | Compile-time RC                     | Tracing GC        |
+| In-place mutation     | Implicit (FBIP)              | Explicit (`mut`)      | Implicit (FBIP)                     | None              |
+| Iteration             | Specialized `loop` construct | `for`/`while`         | Tail recursion (+ `fip` annotation) | Recursion         |
+| Determinism           | High                         | High                  | High                                | Low               |
+| Implementation status | Proposed                     | Production            | Production [4]                      | Production        |
 
-### 10.1 The "Boxed" vs. "Unboxed" DIlemma
+**Table 1: Comparison of memory management approaches**
 
-Reference counting requires a header (RC, Size, Type Tag). In Loreal, this header is 24 bytes (3x 64-bit words). For small types like `Int` or `Bool`, boxing them in a 24-byte header is prohibitively expensive. Loreal implements **Value Unboxing**, where primitive types are passed by value and stored directly in parent structures without a header. Reference counting is only applied to "Heap Objects" (Structs, Tuples, Lists, Strings).
+### 9.1 Rust
 
-### 10.2 Handling Non-Linear Control Flow
+Rust provides performance guarantees comparable to what Loreal targets, but makes the programmer responsible for lifetimes and mutability. Loreal's goal is to recover that performance through compiler inference rather than programmer annotation — the "borrow checker friction" that makes Rust difficult to use for certain functional patterns should disappear.
 
-The liveness analyzer must handle branches within the loop body. If a variable is used in the `then` branch but not the `else` branch, the compiler must insert a `drop` in the `else` branch to ensure the RC is correct at the merge point.
+### 9.2 Koka and FP²
+
+Koka first demonstrated Perceus and FBIP in a production language [4]. Lorenzen, Leijen, and Swierstra later formalized "fully in-place" (FIP) programming with stronger compile-time guarantees [7]. Loreal builds on both. The key difference is the `loop` construct: in Koka, FBIP applies when a function happens to be in tail-call position with a unique receiver. In Loreal, the `loop` construct is an explicit AST node that the compiler always treats as a reuse candidate, regardless of call-site context.
+
+### 9.3 Lean 4
+
+The Lean 4 theorem prover also uses compile-time reference counting with reuse, described by de Moura and Ullrich [8]. Perceus builds on this work. Loreal is closer to Koka in its goals (general-purpose programming rather than proof assistance), but the Lean 4 implementation is an important existence proof that compile-time RC at this level is practically achievable.
+
+---
+
+## 10. Implementation challenges
+
+### 10.1 Unboxed primitives
+
+Reference counting requires a 24-byte header per heap object. For small types like `Int` or `Bool`, this is prohibitively expensive. Loreal will use value unboxing for primitive types: they are passed by value and stored directly in parent structures without a header. Reference counting applies only to heap-allocated types (structs, tuples, lists, strings). This is consistent with the approach Koka takes [4].
+
+### 10.2 Non-linear control flow
+
+When a loop body branches, variables may be live in some branches but not others. The compiler must insert drops on paths where a variable is not used, to keep the RC balanced at the merge point:
 
 ```rust
 loop (x) -> {
   if (cond) {
      use(x);
-     next(x')
+     next(x_prime)
   } else {
-     // drop(x) must be inserted here by the compiler
+     // Compiler inserts: drop(x)
      break(0)
   }
 }
 ```
 
-This "Join-Point Normalization" is handled during the MIR construction phase, ensuring that the resource balance is preserved across all execution paths.
+This "join-point normalization" runs during MIR construction and must handle arbitrarily nested branches correctly. It is one of the harder parts of the implementation.
+
+### 10.3 Cycle avoidance
+
+Standard reference counting cannot reclaim cycles. Loreal addresses this the same way Koka does: the type system discourages cyclic structures through immutability, and the runtime may optionally include a cycle detector for cases where cycles are unavoidable. This is a known limitation of RC-based systems [3] and is not specific to Loreal.
 
 ---
 
-## 11. Future Work: Toward Automatic Parallelism
+## 11. Future directions
 
-The combination of immutability and precise resource tracking provides a unique foundation for concurrency. Future research will explore **Isolate-Based Concurrency**. Because the compiler knows when a reference is unique, it can safely "transfer" ownership of a data structure from one thread to another without deep-copying and without the need for atomic RC.
+The combination of immutability and precise uniqueness tracking opens up some interesting longer-term directions.
 
-Furthermore, we are investigating the feasibility of an **MLIR (Multi-Level Intermediate Representation)** backend. By lowering Loreal loops to MLIR's `scf.for` and `affine.for` dialects, we could leverage LLVM's polyhedral optimizations, enabling automatic vectorization of functional loops.
+**Isolate-based concurrency.** When the compiler knows a reference is unique, it can safely transfer ownership between threads without deep-copying and without atomic RC. This is a stronger form of the message-passing model used in Erlang, but with compile-time uniqueness guarantees rather than runtime copies.
+
+**MLIR backend.** Lowering Loreal loops to MLIR's `scf.for` or `affine.for` dialects [9] would open up polyhedral optimizations and automatic vectorization for functional loops. This is speculative, but the structural regularity of the `loop` construct makes it a better candidate for this kind of analysis than general recursion.
+
+**Cycle collection.** If the language eventually needs to support cyclic structures (for graph algorithms, for example), a backup tracing collector for the cycle case — similar to what CPython does — would be one option. This is a known-tractable problem [3].
 
 ---
 
 ## 12. Conclusion
 
-Resource Management via Hardware-Aware Loop Specialization offers a compelling solution to the long-standing performance gap in functional programming. By elevating the loop construct from a syntactic sugar to a first-class compiler optimization target, Loreal demonstrates that it is possible to achieve deterministic, garbage-free execution with the efficiency of imperative mutation.
+The `loop` construct is a small syntactic change with a large semantic consequence. By making iteration boundaries explicit in the AST rather than relying on the compiler to infer them from tail-call structure, Loreal gives the reuse analyzer exactly the information it needs to perform FBIP transformations reliably.
 
-The integration of the Perceus algorithm, ANF transformation, and FBIP reuse analysis creates a system where high-level abstractions do not come at the cost of hardware control. Our analysis shows that this model not only matches the performance of manual memory management in iterative contexts but also provides superior latency profiles compared to traditional tracing garbage collectors. As software systems increasingly demand both safety and performance, the specialization of iterative constructs remains a vital frontier in compiler design.
+The core argument is this: recursion and iteration are semantically equivalent, but they differ in how much information they expose to the compiler. Recursion hides kill points inside call frames. The `loop` construct makes them structural. That difference is enough, in combination with Perceus, to bridge the performance gap between functional and imperative code for iterative workloads.
 
----
-
-## 13. References
-
-1.  **Collins, G. E.** (1960). *A method for overlapping and erasure of lists*. Communications of the ACM.
-2.  **Reinking, A., Schuster, T., & Smaragdakis, Y.** (2020). *Functional But In-Place: A New Approach to Efficient Functional Programming*. POPL.
-3.  **Lorenzen, K., & Leijen, D.** (2022). *Perceus: Garbage-Free Reference Counting with Reuse*. PLDI.
-4.  **Ullman, J. D.** (1973). *The Theory of Automata and Compiler Design*.
-5.  **Mourad, L., et al.** (2022). *Counting Immutable Beans: Borrow Inference for Reference Counting*. PLDI.
-6.  **Jones, R., Hosking, A., & Moss, E.** (2011). *The Garbage Collection Handbook*. CRC Press.
-7.  **Serrano, A., et al.** (2022). *Koka: A Functional Language with Effect Handlers and Perceus*. DLS.
-8.  **Matsakis, N. D., & Klock II, F. S.** (2014). *The Rust Language*. Ada Letters.
-9.  **Lattner, C., et al.** (2021). *MLIR: A Multi-Level Intermediate Representation for Compiler Development*.
-10. **Wadler, P.** (1990). *Linear types can change the world!*. Programming Concepts and Methods.
+Whether this is sufficient in practice — whether the hit rate on reuse analysis is as high as the theory predicts, whether the liveness analyzer handles real programs without false positives, whether the runtime overhead of the RC check is negligible — are open questions that only an implementation can answer.
 
 ---
 
-## Appendix A: Mathematical Lemmata for FBIP
+## References
 
-### A.1 The Liveness Induction Lemma
+[1] Reinking, A., Xie, N., de Moura, L., & Leijen, D. (2021). Perceus: Garbage-free reference counting with reuse. In _Proceedings of the 42nd ACM SIGPLAN Conference on Programming Language Design and Implementation (PLDI '21)_, pp. 96–111. ACM. https://doi.org/10.1145/3453483.3454032 _(Distinguished Paper Award)_
 
-For any well-typed Loreal expression $e$, if a variable $x$ is not live in the continuation of $e$, then the RC of the object pointed to by $x$ is decremented before the evaluation of the continuation.
+[2] Collins, G. E. (1960). A method for overlapping and erasure of lists. _Communications of the ACM_, 3(12), 655–657. https://doi.org/10.1145/367487.367501
 
-*Proof Sketch*: By induction on the structure of $e$. In the case of `Loop`, the `Next` expression explicitly triggers the drop of all induction variables, satisfying the induction hypothesis for the subsequent iteration. $\square$
+[3] Jones, R., Hosking, A., & Moss, E. (2011). _The garbage collection handbook: The art of automatic memory management_. CRC Press.
+
+[4] Leijen, D. (ongoing). The Koka programming language. Microsoft Research. https://koka-lang.github.io/koka/doc/book.html
+
+[5] Wadler, P. (1990). Linear types can change the world! In _IFIP TC 2 Working Conference on Programming Concepts and Methods_, Sea of Galilee, Israel. Published in M. Broy & C. B. Jones (eds.), _Programming Concepts and Methods_, North Holland.
+
+[6] Lorenzen, A., & Leijen, D. (2022). Reference counting with frame-limited reuse. Microsoft Research Technical Report MSR-TR-2021-30. https://www.microsoft.com/en-us/research/publication/reference-counting-with-frame-limited-reuse/
+
+[7] Lorenzen, A., Leijen, D., & Swierstra, W. (2023). FP²: Fully in-place functional programming. In _Proceedings of the 28th ACM SIGPLAN International Conference on Functional Programming (ICFP '23)_. ACM.
+
+[8] Ullrich, S., & de Moura, L. (2019). Counting immutable beans: Reference counting optimized for purely functional programming. In _31st Symposium on Implementation and Application of Functional Languages (IFL '19)_. ACM. https://doi.org/10.1145/3412932.3412935
+
+[9] Lattner, C., Amini, M., Bondhugula, U., et al. (2021). MLIR: Scaling compiler infrastructure for domain specific computation. In _IEEE/ACM International Symposium on Code Generation and Optimization (CGO '21)_. https://doi.org/10.1109/CGO51591.2021.9370308
+
+[10] Matsakis, N. D., & Klock, F. S. (2014). The Rust language. In _ACM SIGAda Ada Letters_, 34(3), 103–104. https://doi.org/10.1145/2692956.2663188
+
+---
+
+## Appendix A: Liveness induction lemma
+
+**Lemma A.1:** For any well-typed Loreal expression $e$, if a variable $x$ is not live in the continuation of $e$, then $RC(x)$ is decremented before the continuation evaluates.
+
+**Proof sketch:** By structural induction on $e$. The base cases (variables, constants) follow from the Perceus typing rules directly. For the `Loop` case: the [NEXT-ITER] rule explicitly drops all induction variables $\vec{x}$ before the back-edge jump. Variables forwarded through `next` are bound to fresh names in the next iteration, so the old bindings are in the kill set by construction. The induction hypothesis holds for each iteration body by the same argument applied to the sub-expressions within the body.
+
+---
+
+_This paper describes a language design and proposed compiler architecture. Partial implementation exists at time of writing._
