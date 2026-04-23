@@ -1,0 +1,61 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  path?: string;
+  keywords?: string[];
+  schema?: Record<string, unknown> | Array<Record<string, unknown>>;
+}
+
+const {
+  title,
+  description,
+  path = '/',
+  keywords = [],
+  schema,
+} = Astro.props;
+
+const siteUrl = Astro.site ?? new URL('https://loreal.pasindupramodya.com');
+const canonical = new URL(path, siteUrl).toString();
+const ogImage = new URL('/og-loreal.svg', siteUrl).toString();
+const schemaJson = schema ? JSON.stringify(schema) : null;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {keywords.length > 0 && <meta name="keywords" content={keywords.join(', ')} />}
+    <meta name="author" content="Pasindu Pramodya" />
+    <meta name="theme-color" content="#ffe76a" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="me" href="https://pasindupramodya.com" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:site_name" content="Loreal" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    {schemaJson && <script type="application/ld+json" set:html={schemaJson} />}
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

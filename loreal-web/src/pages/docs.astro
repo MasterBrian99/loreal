@@ -1,0 +1,49 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'Loreal Docs | WIP';
+const description = 'Loreal documentation by Pasindu Pramodya is still in progress.';
+const keywords = ['Loreal docs', 'Pasindu Pramodya', 'Loreal programming language', 'functional language docs'];
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: title,
+  description,
+  url: 'https://loreal.pasindupramodya.com/docs',
+  author: {
+    '@type': 'Person',
+    name: 'Pasindu Pramodya',
+    url: 'https://pasindupramodya.com',
+  },
+};
+---
+
+<BaseLayout title={title} description={description} path="/docs" keywords={keywords} schema={schema}>
+  <main class="noise-grid flex min-h-screen items-center justify-center px-4 py-16">
+    <section class="brutal-card w-full max-w-5xl bg-white p-8 text-center sm:p-12 lg:p-16">
+      <p class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]">Documentation route</p>
+      <h1 class="mt-6 text-6xl font-black uppercase leading-none tracking-[-0.08em] sm:text-8xl lg:text-[10rem]">
+        WIP
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg leading-8 text-[var(--muted)]">
+        The documentation site is not published yet. Loreal is still under active design and implementation.
+      </p>
+      <div class="mt-10 flex flex-wrap justify-center gap-4">
+        <a
+          href="/"
+          class="rounded-full border-3 border-[var(--border)] bg-[var(--panel-strong)] px-6 py-3 text-sm font-extrabold uppercase tracking-[0.12em] shadow-[6px_6px_0_0_var(--border)] transition-transform duration-150 hover:-translate-y-1"
+        >
+          Back home
+        </a>
+        <a
+          href="https://github.com/MasterBrian99/loreal"
+          target="_blank"
+          rel="noreferrer"
+          class="rounded-full border-3 border-[var(--border)] bg-[var(--surface)] px-6 py-3 text-sm font-extrabold uppercase tracking-[0.12em] shadow-[6px_6px_0_0_var(--border)] transition-transform duration-150 hover:-translate-y-1"
+        >
+          Follow progress
+        </a>
+      </div>
+    </section>
+  </main>
+</BaseLayout>

@@ -1,0 +1,57 @@
+@import "@fontsource/space-grotesk/400.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource-variable/jetbrains-mono";
+@import "tailwindcss";
+
+:root {
+  --bg: #f6f0e8;
+  --panel: #fffaf2;
+  --panel-strong: #ffe76a;
+  --surface: #d9f4ff;
+  --surface-2: #ffb6b9;
+  --surface-3: #c6ff8a;
+  --ink: #111111;
+  --muted: #4b4b4b;
+  --border: #111111;
+  --shadow: 8px 8px 0 0 var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(255, 182, 185, 0.55), transparent 25%),
+    radial-gradient(circle at 100% 20%, rgba(198, 255, 138, 0.5), transparent 20%),
+    linear-gradient(180deg, #fff8de 0%, var(--bg) 100%);
+  color: var(--ink);
+  font-family: "Space Grotesk", sans-serif;
+}
+
+::selection {
+  background: var(--panel-strong);
+  color: var(--ink);
+}
+
+.brutal-card {
+  border: 3px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 1.5rem;
+}
+
+.noise-grid {
+  background-image:
+    linear-gradient(to right, rgba(17, 17, 17, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(17, 17, 17, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.hero-glow {
+  background:
+    linear-gradient(135deg, rgba(255, 231, 106, 0.85), rgba(217, 244, 255, 0.95)),
+    var(--panel);
+}
