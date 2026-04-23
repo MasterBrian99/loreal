@@ -1,0 +1,536 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const title =
+  "Loreal Programming Language by Pasindu Pramodya | Experimental Functional Language";
+const description =
+  "Loreal is an experimental functional programming language by Pasindu Pramodya, a system engineer focused on scalable systems, performance engineering, compiler architecture, and hardware-aware loop specialization.";
+const keywords = [
+  "Loreal programming language",
+  "Pasindu Pramodya",
+  "Pasindu",
+  "functional programming language",
+  "new programming language",
+  "programming language research",
+  "compile-time reference counting",
+  "hardware-aware loop specialization",
+  "FBIP",
+  "Perceus",
+];
+
+const navItems = [
+  { label: "Paper", href: "#paper" },
+  { label: "Language", href: "#language" },
+  { label: "Playground", href: "#playground" },
+  { label: "Features", href: "#features" },
+  { label: "Roadmap", href: "#roadmap" },
+];
+
+const featureCards = [
+  {
+    title: "Explicit loop kill-points",
+    body: "Loreal introduces a dedicated loop construct where `next` becomes a structural boundary for liveness and reuse analysis.",
+    tone: "bg-[var(--surface)]",
+  },
+  {
+    title: "Perceus-style RC pipeline",
+    body: "The design follows compile-time reference counting with precise drop insertion instead of runtime tracing GC pauses.",
+    tone: "bg-[var(--surface-3)]",
+  },
+  {
+    title: "FBIP mutation path",
+    body: "Pure-looking transformations can reuse memory in place when uniqueness holds, targeting O(1) overhead per iteration.",
+    tone: "bg-[var(--surface-2)]",
+  },
+  {
+    title: "Compiler-first architecture",
+    body: "ANF, MIR CFG construction, liveness passes, and LLVM lowering are central to the language design from the start.",
+    tone: "bg-[var(--panel-strong)]",
+  },
+];
+
+const examples = [
+  {
+    title: "Loop-specialized filter",
+    code: `def filter_loop(list, p) do
+  loop (list, []) (curr, acc) ->
+    match curr do
+      Nil -> break(reverse(acc))
+      Cons(x, xs) ->
+        if p(x) do
+          next(xs, Cons(x, acc))
+        else
+          next(xs, acc)
+        end
+    end
+  end
+end`,
+  },
+  {
+    title: "Minimal loop shape",
+    code: `loop (init_val) (var) -> {
+  if (condition) {
+    next(updated_val)
+  } else {
+    break(result)
+  }
+}`,
+  },
+];
+
+const roadmap = [
+  "Stabilize parser, AST, and core syntax for the `loop` construct.",
+  "Finish MIR CFG generation and liveness analysis around `next` boundaries.",
+  "Implement RC insertion and greedy reuse detection for drop-to-alloc patterns.",
+  "Lower reuse tokens into LLVM conditional reuse blocks.",
+  "Ship the first public docs and a runnable browser playground.",
+];
+
+const schema = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Loreal",
+    url: "https://loreal.pasindupramodya.com",
+    description,
+    keywords,
+    creator: {
+      "@type": "Person",
+      name: "Pasindu Pramodya",
+      url: "https://pasindupramodya.com",
+    },
+    about: [
+      "Programming languages",
+      "Functional programming",
+      "Compiler design",
+      "Reference counting",
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: "Pasindu Pramodya",
+    url: "https://pasindupramodya.com",
+    sameAs: [
+      "https://pasindupramodya.com",
+      "https://github.com/masterbrian99",
+      "https://www.linkedin.com/in/pasindu-p-konghawaththa-3808861a0/",
+      "https://x.com/Master_br1an",
+    ],
+    jobTitle: "System Engineer",
+    description:
+      "System engineer with 4+ years of experience building scalable backend systems and robust infrastructure, with interests in distributed systems, performance engineering, open source, and system architecture.",
+    knowsAbout: [
+      "Programming languages",
+      "Functional languages",
+      "Compiler architecture",
+      "Reference counting",
+      "LLVM",
+      "Distributed systems",
+      "Performance engineering",
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    name: "Loreal",
+    codeRepository: "https://github.com/MasterBrian99/loreal",
+    url: "https://loreal.pasindupramodya.com",
+    author: {
+      "@type": "Person",
+      name: "Pasindu Pramodya",
+      url: "https://pasindupramodya.com",
+    },
+    programmingLanguage: "Loreal",
+    runtimePlatform: "LLVM",
+    description,
+  },
+];
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  path="/"
+  keywords={keywords}
+  schema={schema}
+>
+  <div class="noise-grid min-h-screen">
+    <header
+      class="sticky top-0 z-30 border-b-3 border-[var(--border)] bg-[rgba(255,250,242,0.9)] backdrop-blur-sm"
+    >
+      <div
+        class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-4 sm:px-6 lg:px-8"
+      >
+        <a
+          href="#top"
+          class="inline-flex items-center gap-3 text-sm font-bold uppercase tracking-[0.2em]"
+        >
+          <span
+            class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border-3 border-[var(--border)] bg-[var(--panel-strong)] text-lg shadow-[4px_4px_0_0_var(--border)]"
+            >L</span
+          >
+          Loreal
+        </a>
+        <nav class="hidden items-center gap-4 md:flex">
+          {
+            navItems.map((item) => (
+              <a
+                href={item.href}
+                class="rounded-full border-3 border-[var(--border)] bg-white px-4 py-2 text-sm font-semibold transition-transform duration-150 hover:-translate-y-1"
+              >
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+        <div class="flex items-center gap-3">
+          <a
+            href="/docs"
+            class="rounded-full border-3 border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-bold shadow-[4px_4px_0_0_var(--border)] transition-transform duration-150 hover:-translate-y-1"
+          >
+            Docs
+          </a>
+          <a
+            href="https://github.com/MasterBrian99/loreal"
+            target="_blank"
+            rel="noreferrer"
+            class="rounded-full border-3 border-[var(--border)] bg-[var(--panel-strong)] px-4 py-2 text-sm font-bold shadow-[4px_4px_0_0_var(--border)] transition-transform duration-150 hover:-translate-y-1"
+          >
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-20">
+        <div class="grid gap-8 lg:grid-cols-[1.25fr_0.75fr]">
+          <div
+            class="brutal-card hero-glow relative overflow-hidden p-8 lg:p-12"
+          >
+            <div
+              class="mb-6 inline-flex rounded-full border-3 border-[var(--border)] bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.2em]"
+            >
+              A New Functional Programming Language
+            </div>
+            <h1
+              class="max-w-4xl text-5xl font-black uppercase leading-[0.95] tracking-[-0.04em] sm:text-6xl lg:text-8xl"
+            >
+              Loreal is building a hardware-aware functional language.
+            </h1>
+            <p class="mt-6 max-w-2xl text-lg leading-8 text-[var(--muted)]">
+              Loreal is a programming language project by <strong
+                >Pasindu Pramodya</strong
+              >, a system engineer focused on deterministic memory management,
+              compile-time reference counting, and a dedicated <code>loop</code>
+              construct that exposes reuse opportunities instead of hiding them inside
+              recursion.
+            </p>
+            <div class="mt-8 flex flex-wrap gap-4">
+              <a
+                href="#paper"
+                class="rounded-full border-3 border-[var(--border)] bg-[var(--panel-strong)] px-6 py-3 text-sm font-extrabold uppercase tracking-[0.12em] shadow-[6px_6px_0_0_var(--border)] transition-transform duration-150 hover:-translate-y-1"
+              >
+                Read the research
+              </a>
+              <a
+                href="#playground"
+                class="rounded-full border-3 border-[var(--border)] bg-white px-6 py-3 text-sm font-extrabold uppercase tracking-[0.12em] transition-transform duration-150 hover:-translate-y-1"
+              >
+                View examples
+              </a>
+              <a
+                href="https://pasindupramodya.com"
+                target="_blank"
+                rel="noreferrer"
+                class="rounded-full border-3 border-[var(--border)] bg-[var(--surface)] px-6 py-3 text-sm font-extrabold uppercase tracking-[0.12em] transition-transform duration-150 hover:-translate-y-1"
+              >
+                Meet the developer
+              </a>
+            </div>
+          </div>
+
+          <aside class="space-y-6">
+            <div class="brutal-card bg-white p-6">
+              <p
+                class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]"
+              >
+                Core thesis
+              </p>
+              <p class="mt-3 text-2xl font-black leading-tight">
+                Replace recursion-heavy iteration with explicit CFG loops that
+                make uniqueness visible to the compiler.
+              </p>
+            </div>
+            <div class="brutal-card bg-[var(--surface)] p-6">
+              <p class="text-sm font-bold uppercase tracking-[0.16em]">
+                Current status
+              </p>
+              <p class="mt-3 text-5xl font-black uppercase leading-none">WIP</p>
+              <p class="mt-4 text-sm leading-7 text-[var(--muted)]">
+                Research direction is defined. Public docs, browser tooling, and
+                end-to-end implementation are still in progress.
+              </p>
+            </div>
+            <div class="brutal-card bg-[var(--surface-3)] p-6">
+              <p class="text-sm font-bold uppercase tracking-[0.16em]">
+                Implementation
+              </p>
+              <a
+                href="https://github.com/MasterBrian99/loreal"
+                target="_blank"
+                rel="noreferrer"
+                class="mt-3 inline-block text-lg font-black underline decoration-3 underline-offset-4"
+              >
+                github.com/MasterBrian99/loreal
+              </a>
+              <p class="mt-3 text-sm leading-7 text-[var(--muted)]">
+                Follow the compiler work around MIR, liveness, runtime layout,
+                and LLVM code generation.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section
+        id="paper"
+        class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
+      >
+        <div class="brutal-card bg-white p-8 lg:p-10">
+          <div
+            class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"
+          >
+            <div class="max-w-3xl">
+              <p
+                class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]"
+              >
+                Read the research paper
+              </p>
+              <h2
+                class="mt-3 text-3xl font-black uppercase tracking-[-0.03em] sm:text-4xl"
+              >
+                Resource management via hardware-aware loop specialization
+              </h2>
+              <p class="mt-4 text-base leading-8 text-[var(--muted)]">
+                The paper argues that a dedicated <code>loop</code> construct gives
+                the compiler stronger lifetime information than general recursion,
+                enabling compile-time reference counting, deterministic drops, and
+                Functional But In-Place mutation when uniqueness is preserved.
+              </p>
+            </div>
+            <a
+              href="https://github.com/MasterBrian99/loreal/blob/master/Research_Paper.md"
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center justify-center rounded-full border-3 border-[var(--border)] bg-[var(--panel-strong)] px-6 py-3 text-sm font-extrabold uppercase tracking-[0.12em] shadow-[6px_6px_0_0_var(--border)] transition-transform duration-150 hover:-translate-y-1"
+            >
+              Open paper
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="language"
+        class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
+      >
+        <div class="grid gap-6 lg:grid-cols-2">
+          <div class="brutal-card bg-[var(--surface)] p-8">
+            <p
+              class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]"
+            >
+              Explain the language
+            </p>
+            <h2 class="mt-3 text-3xl font-black uppercase tracking-[-0.03em]">
+              What Loreal is trying to prove
+            </h2>
+            <p class="mt-4 text-base leading-8 text-[var(--muted)]">
+              Loreal is a functional language design that tries to bridge
+              semantic clarity and hardware efficiency without using tracing GC
+              or pushing ownership annotations onto the programmer. The compiler
+              pipeline is designed around exact last-use analysis, explicit
+              drops, and reuse opportunities that emerge from loop boundaries.
+            </p>
+          </div>
+          <div class="brutal-card bg-[var(--surface-2)] p-8">
+            <p
+              class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]"
+            >
+              Why this functional language matters
+            </p>
+            <ul class="mt-4 space-y-4 text-base leading-8 text-[var(--ink)]">
+              <li>
+                Perceus-style reference counting replaces non-deterministic
+                collection with precise compile-time drops.
+              </li>
+              <li>
+                <code>next</code> acts as a hard kill-point, making current-iteration
+                bindings dead before the back edge.
+              </li>
+              <li>
+                Reuse analysis can turn drop-to-alloc pairs into conditional
+                in-place mutation for uniquely owned values.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="playground"
+        class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
+      >
+        <div class="brutal-card bg-[var(--ink)] p-8 text-white lg:p-10">
+          <div
+            class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"
+          >
+            <div class="max-w-2xl">
+              <p
+                class="text-xs font-bold uppercase tracking-[0.2em] text-white/70"
+              >
+                Interactive playground
+              </p>
+              <h2
+                class="mt-3 text-3xl font-black uppercase tracking-[-0.03em] sm:text-4xl"
+              >
+                Examples now, execution soon
+              </h2>
+              <p class="mt-4 text-base leading-8 text-white/80">
+                The playground section shows the syntax direction and
+                loop-oriented model. The run path is intentionally disabled
+                until the compiler and browser integration exist.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled
+              class="cursor-not-allowed rounded-full border-3 border-white bg-white px-6 py-3 text-sm font-extrabold uppercase tracking-[0.12em] text-[var(--ink)] opacity-70"
+            >
+              Run soon
+            </button>
+          </div>
+
+          <div class="mt-8 overflow-x-auto pb-2">
+            <div class="grid min-w-[42rem] gap-6 lg:min-w-0 lg:grid-cols-2">
+              {
+                examples.map((example) => (
+                  <div class="rounded-[1.25rem] border-3 border-white bg-[rgba(255,255,255,0.08)] p-5">
+                    <p class="text-sm font-bold uppercase tracking-[0.16em] text-white/80">
+                      {example.title}
+                    </p>
+                    <pre class="mt-4 overflow-x-auto rounded-2xl bg-black/50 p-4 text-left text-sm leading-7 text-[var(--surface-3)]">
+                      <code class="block text-left">{example.code}</code>
+                    </pre>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="features"
+        class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
+      >
+        <div class="flex items-end justify-between gap-6">
+          <div>
+            <p
+              class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]"
+            >
+              Key features
+            </p>
+            <h2
+              class="mt-3 text-3xl font-black uppercase tracking-[-0.03em] sm:text-4xl"
+            >
+              Minimal surface, compiler-heavy design
+            </h2>
+          </div>
+        </div>
+        <div class="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {
+            featureCards.map((card) => (
+              <article class:list={["brutal-card p-6", card.tone]}>
+                <h3 class="text-xl font-black uppercase">{card.title}</h3>
+                <p class="mt-4 text-base leading-8 text-[var(--muted)]">
+                  {card.body}
+                </p>
+              </article>
+            ))
+          }
+        </div>
+      </section>
+
+      <section
+        id="roadmap"
+        class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
+      >
+        <div class="brutal-card bg-white p-8 lg:p-10">
+          <p
+            class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]"
+          >
+            Development roadmap
+          </p>
+          <h2
+            class="mt-3 text-3xl font-black uppercase tracking-[-0.03em] sm:text-4xl"
+          >
+            From language paper to usable toolchain
+          </h2>
+          <div class="mt-8 grid gap-4">
+            {
+              roadmap.map((item, index) => (
+                <div class="flex gap-4 rounded-[1.25rem] border-3 border-[var(--border)] bg-[var(--panel)] p-4">
+                  <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-3 border-[var(--border)] bg-[var(--panel-strong)] text-lg font-black">
+                    {index + 1}
+                  </span>
+                  <p class="pt-2 text-base font-medium leading-7">{item}</p>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="mt-8 border-t-3 border-[var(--border)] bg-white">
+      <div
+        class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8"
+      >
+        <p class="font-bold uppercase tracking-[0.16em]">
+          Loreal by Pasindu Pramodya. Functional, deterministic, still under
+          construction.
+        </p>
+        <div class="flex flex-wrap gap-4">
+          <a
+            href="/docs"
+            class="font-semibold underline decoration-2 underline-offset-4"
+            >Docs</a
+          >
+          <a
+            href="https://github.com/MasterBrian99/loreal/blob/master/Research_Paper.md"
+            target="_blank"
+            rel="noreferrer"
+            class="font-semibold underline decoration-2 underline-offset-4"
+            >Research paper</a
+          >
+          <a
+            href="https://github.com/MasterBrian99/loreal"
+            target="_blank"
+            rel="noreferrer"
+            class="font-semibold underline decoration-2 underline-offset-4"
+            >GitHub</a
+          >
+          <a
+            href="https://pasindupramodya.com"
+            target="_blank"
+            rel="noreferrer"
+            class="font-semibold underline decoration-2 underline-offset-4"
+            >Pasindu Pramodya</a
+          >
+        </div>
+      </div>
+    </footer>
+  </div>
+</BaseLayout>
